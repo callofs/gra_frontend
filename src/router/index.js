@@ -1,13 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import pinia from '@/store'
+import { useAppStore } from '@/store/app'
 
 import LoginView from '../views/LoginView.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 
-import ForumView from '../views/ForumView.vue'
-import MarketView from '../views/MarketView.vue'
-import LecturesView from '../views/LecturesView.vue'
-import CoursesView from '../views/CoursesView.vue'
-import ProfileView from '../views/ProfileView.vue'
+import HomeView from '../views/Home.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 
 const routes = [
@@ -21,35 +19,17 @@ const routes = [
     path: '/',
     component: MainLayout,
     children: [
-      { path: '', redirect: '/forum' },
+      { path: '', redirect: '/home' },
       {
-        path: 'forum',
-        name: 'forum',
-        component: ForumView,
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'market',
-        name: 'market',
-        component: MarketView,
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'lectures',
-        name: 'lectures',
-        component: LecturesView,
-        meta: { requiresAuth: true },
-      },
-      {
-        path: 'courses',
-        name: 'courses',
-        component: CoursesView,
-        meta: { requiresAuth: true },
+        path: 'home',
+        name: 'home',
+        component: HomeView,
+        meta: { public: true },
       },
       {
         path: 'profile',
         name: 'profile',
-        component: ProfileView,
+        component: () => import('@/views/selfCenter/index.vue'),
         meta: { requiresAuth: true },
       },
     ],
@@ -67,18 +47,23 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to) => {
+const appStore = useAppStore(pinia)
+
+router.beforeEach(async (to) => {
+  if (!appStore.authInitialized) {
+    await appStore.initAuth()
+  }
+
+  if (to.name === 'login' && appStore.isLoggedIn) {
+    return { name: 'home' }
+  }
+
   if (to.meta?.public) return true
 
-  const isLoggedIn = !!localStorage.getItem('demo_token')
+  const isLoggedIn = appStore.isLoggedIn
   if (to.meta?.requiresAuth && !isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
-
-  if (to.name === 'login' && isLoggedIn) {
-    return { name: 'forum' }
-  }
-
   return true
 })
 

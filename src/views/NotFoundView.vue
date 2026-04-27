@@ -15,7 +15,7 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 function go() {
-  router.replace('/forum')
+  router.replace('/home')
 }
 </script>
 

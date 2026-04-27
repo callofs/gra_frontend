@@ -1,59 +1,210 @@
 <template>
   <div class="page">
     <div class="card">
-      <div class="title">登录</div>
-      <div class="sub">家长育儿经验交流与互助平台（前端演示）</div>
+      <div class="title">{{ formType === 'login' ? '登录' : '注册' }}</div>
+      <div class="sub">家长育儿经验交流与互助平台</div>
 
-      <form class="form" @submit.prevent="onSubmit">
-        <label class="field">
-          <div class="label">用户名</div>
-          <input v-model.trim="username" class="input" placeholder="请输入用户名" autocomplete="username" />
-        </label>
+      <el-form
+        v-if="formType === 'login'"
+        ref="loginFormRef"
+        :model="loginForm"
+        :rules="loginRules"
+        class="form"
+        label-position="top"
+        @submit.prevent="onSubmit"
+      >
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model.trim="loginForm.username" placeholder="请输入用户名" autocomplete="username" />
+        </el-form-item>
 
-        <label class="field">
-          <div class="label">密码</div>
-          <input v-model.trim="password" class="input" placeholder="请输入密码" type="password" autocomplete="current-password" />
-        </label>
+        <el-form-item label="密码" prop="password">
+          <el-input
+            v-model.trim="loginForm.password"
+            type="password"
+            show-password
+            placeholder="请输入密码"
+            autocomplete="current-password"
+            @keyup.enter="onSubmit"
+          />
+        </el-form-item>
 
         <div v-if="error" class="error">{{ error }}</div>
 
-        <button class="btn" type="submit">进入平台</button>
+        <el-button class="btn" type="primary" :loading="appStore.loading" @click="onSubmit">进入平台</el-button>
+      </el-form>
 
-        <div class="hint">
-          本页面不调用后端接口：任意输入均可登录。
-        </div>
-      </form>
+      <el-form
+        v-else
+        ref="registerFormRef"
+        :model="registerForm"
+        :rules="registerRules"
+        class="form"
+        label-position="top"
+        @submit.prevent="onRegister"
+      >
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model.trim="registerForm.username" placeholder="请输入用户名" autocomplete="username" />
+        </el-form-item>
+
+        <el-form-item label="密码" prop="password">
+          <el-input
+            v-model.trim="registerForm.password"
+            type="password"
+            show-password
+            placeholder="请输入密码"
+            autocomplete="new-password"
+          />
+        </el-form-item>
+
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model.trim="registerForm.confirmPassword"
+            type="password"
+            show-password
+            placeholder="请再次输入密码"
+            autocomplete="new-password"
+            @keyup.enter="onRegister"
+          />
+        </el-form-item>
+
+        <div v-if="error" class="error">{{ error }}</div>
+
+        <el-button class="btn" type="primary" :loading="appStore.loading" @click="onRegister">注册账号</el-button>
+      </el-form>
+
+      <div class="hint">
+        <span v-if="formType === 'login'" class="hint-action" @click="switchForm('register')">注册</span>
+        <span v-else class="hint-action" @click="switchForm('login')">返回登录</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { login, register } from '@/api/user'
+import { useAppStore } from '@/store/app'
 
 const router = useRouter()
 const route = useRoute()
+const appStore = useAppStore()
 
-const username = ref('')
-const password = ref('')
+const loginFormRef = ref()
+const registerFormRef = ref()
 const error = ref('')
+const formType = ref('login')
 
-function onSubmit() {
+const loginForm = reactive({
+  username: '',
+  password: '',
+})
+
+const registerForm = reactive({
+  username: '',
+  password: '',
+  confirmPassword: '',
+})
+
+const loginRules = {
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+}
+
+const validateConfirmPassword = (_, value, callback) => {
+  if (!value) {
+    callback(new Error('请再次输入密码'))
+    return
+  }
+
+  if (value !== registerForm.password) {
+    callback(new Error('两次输入的密码不一致'))
+    return
+  }
+
+  callback()
+}
+
+const registerRules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 2, max: 20, message: '用户名长度为 2 到 20 个字符', trigger: 'blur' },
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少 6 位', trigger: 'blur' },
+  ],
+  confirmPassword: [{ validator: validateConfirmPassword, trigger: 'blur' }],
+}
+
+function resetError() {
   error.value = ''
-  if (!username.value) {
-    error.value = '请输入用户名'
-    return
-  }
-  if (!password.value) {
-    error.value = '请输入密码'
+}
+
+function switchForm(type) {
+  formType.value = type
+  resetError()
+}
+
+async function onSubmit() {
+  resetError()
+
+  const valid = await loginFormRef.value?.validate().catch(() => false)
+  if (!valid) {
     return
   }
 
-  localStorage.setItem('demo_token', String(Date.now()))
-  localStorage.setItem('demo_user', username.value)
+  try {
+    appStore.setLoading(true)
 
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/forum'
-  router.replace(redirect)
+    const result = await login({
+      username: loginForm.username,
+      password: loginForm.password,
+    })
+
+    appStore.setAuthenticated(true)
+    appStore.setUserInfo(result?.userInfo || { username: loginForm.username })
+    appStore.setAuthInitialized(true)
+
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/home'
+    router.replace(redirect)
+  } catch (err) {
+    error.value = err?.message || '登录失败'
+    appStore.logout()
+  } finally {
+    appStore.setLoading(false)
+  }
+}
+
+async function onRegister() {
+  resetError()
+
+  const valid = await registerFormRef.value?.validate().catch(() => false)
+  if (!valid) {
+    return
+  }
+
+  try {
+    appStore.setLoading(true)
+
+    await register({
+      username: registerForm.username,
+      password: registerForm.password,
+    })
+
+    ElMessage.success('注册成功，请登录')
+    loginForm.username = registerForm.username
+    loginForm.password = ''
+    registerForm.username = ''
+    registerForm.password = ''
+    registerForm.confirmPassword = ''
+    switchForm('login')
+  } catch (err) {
+    error.value = err?.message || '注册失败'
+  } finally {
+    appStore.setLoading(false)
+  }
 }
 </script>
 
@@ -91,49 +242,13 @@ function onSubmit() {
 
 .form {
   margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.label {
-  font-size: 13px;
-  opacity: 0.9;
-}
-
-.input {
-  height: 40px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.94);
-  padding: 0 12px;
-  outline: none;
-}
-
-.input:focus {
-  border-color: rgba(99, 102, 241, 0.7);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
 }
 
 .btn {
+  width: 100%;
   height: 42px;
-  border: none;
   border-radius: 12px;
-  background: #3b82f6;
-  color: #fff;
   font-weight: 650;
-  cursor: pointer;
-}
-
-.btn:hover {
-  filter: brightness(1.05);
 }
 
 .error {
@@ -146,8 +261,24 @@ function onSubmit() {
 }
 
 .hint {
+  margin-top: 12px;
   font-size: 12px;
   opacity: 0.82;
   line-height: 1.5;
+  text-align: right;
+}
+
+.hint-action {
+  cursor: pointer;
+  color: #93c5fd;
+}
+
+:deep(.el-form-item__label) {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
 }
 </style>
