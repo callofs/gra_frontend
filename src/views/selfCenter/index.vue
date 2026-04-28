@@ -51,7 +51,7 @@
 
               <div class="hero-tags">
                 <span class="tag primary">已实名</span>
-                <span class="tag">{{ profileForm.role }}</span>
+                <span class="tag">{{ character }}</span>
               </div>
             </div>
 
@@ -246,6 +246,8 @@ const editableProfile = computed(() => ({
 }))
 
 const displayName = computed(() => profileForm.name || profileForm.username || appStore.username || '游客')
+
+const character = computed(() => appStore.role)
 
 const avatarText = computed(() => {
   return String(displayName.value).trim().slice(0, 1).toUpperCase() || '游'

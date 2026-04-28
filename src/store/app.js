@@ -2,9 +2,9 @@ import { defineStore } from 'pinia'
 import { getAvatar, getCurrentUser } from '@/api/user'
 
 const objMap = {
-  0: '普通用户',
-  1: '管理员',
-  2: '专家'
+  1: '普通用户',
+  2: '管理员',
+  3: '专家'
 }
 
 const defaultState = () => ({
