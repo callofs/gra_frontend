@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { getCurrentUser } from '@/api/user'
+import { getAvatar, getCurrentUser } from '@/api/user'
 
 const objMap = {
   0: '普通用户',
@@ -15,6 +15,20 @@ const defaultState = () => ({
   loading: false,
   theme: 'light'
 })
+
+function blobToDataUrl(blob) {
+  const normalizedBlob =
+    blob && typeof blob === 'object' && blob.type === 'application/octet-stream'
+      ? new Blob([blob], { type: 'image/png' })
+      : blob
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('读取头像失败'))
+    reader.readAsDataURL(normalizedBlob)
+  })
+}
 
 export const useAppStore = defineStore('app', {
   state: () => defaultState(),
@@ -66,6 +80,21 @@ export const useAppStore = defineStore('app', {
           const userInfo = result?.userInfo || result?.data || result
 
           this.setUserInfo(userInfo)
+
+          try {
+            const avatarBlob = await getAvatar()
+            if (avatarBlob && typeof avatarBlob === 'object' && typeof avatarBlob.size === 'number' && avatarBlob.size > 0) {
+              const avatarDataUrl = await blobToDataUrl(avatarBlob)
+              if (avatarDataUrl) {
+                this.setUserInfo({
+                  ...(this.userInfo || {}),
+                  avatar: avatarDataUrl,
+                })
+              }
+            }
+          } catch (error) {
+          }
+
           this.setAuthInitialized(true)
           return true
         } catch (error) {

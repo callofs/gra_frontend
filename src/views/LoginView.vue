@@ -164,8 +164,11 @@ async function onSubmit() {
     })
 
     appStore.setAuthenticated(true)
-    appStore.setUserInfo(result?.userInfo || { username: loginForm.username })
-    appStore.setAuthInitialized(true)
+    const authed = await appStore.initAuth(true)
+    if (!authed) {
+      appStore.setUserInfo(result?.userInfo || { username: loginForm.username })
+      appStore.setAuthInitialized(true)
+    }
 
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/home'
     router.replace(redirect)

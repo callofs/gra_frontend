@@ -34,3 +34,26 @@ export function logoutRequest() {
     method: 'post'
   })
 }
+
+export function uploadAvatar(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return request({
+    url: '/user/updateAvatar',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+export function getAvatar() {
+  return request({
+    url: '/user/getAvatar',
+    method: 'get',
+    responseType: 'blob',
+    skipAuthRedirect: true
+  })
+}

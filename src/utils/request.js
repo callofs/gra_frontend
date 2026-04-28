@@ -37,6 +37,10 @@ service.interceptors.response.use(
     const data = response?.data
     const requestUrl = response?.config?.url
 
+    // 如果是blob响应则直接返回
+    const responseType = response?.config?.responseType
+    if (responseType === 'blob') return data
+
     // 如果后端返回的不是对象（例如直接返回字符串/数组等），直接透传
     if (!data || typeof data !== 'object') return data
 

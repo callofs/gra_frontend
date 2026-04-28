@@ -25,10 +25,22 @@
     <div class="main-column">
       <section id="profile-section" class="card hero-card">
         <div class="profile-hero">
-          <div class="avatar-wrap">
-            <img v-if="avatarSrc" class="avatar-image" :src="avatarSrc" alt="用户头像" />
-            <div v-else class="avatar-fallback">{{ avatarText }}</div>
-          </div>
+          <el-upload
+            class="avatar-uploader"
+            :show-file-list="false"
+            accept="image/*"
+            :auto-upload="true"
+            :before-upload="beforeAvatarUpload"
+            :http-request="uploadAvatarRequest"
+          >
+            <div class="avatar-wrap" role="button" tabindex="0">
+              <img v-if="avatarSrc" class="avatar-image" :src="avatarSrc" alt="用户头像" />
+              <div v-else class="avatar-fallback">{{ avatarText }}</div>
+              <div class="avatar-overlay">
+                <span class="avatar-overlay-text">点击更换头像</span>
+              </div>
+            </div>
+          </el-upload>
 
           <div class="hero-content">
             <div class="hero-top">
@@ -157,9 +169,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { logoutRequest } from '@/api/user'
+import { getAvatar, logoutRequest, uploadAvatar } from '@/api/user'
 import { useAppStore } from '@/store/app'
 import EditPage from './components/editPage.vue'
 
@@ -217,13 +229,7 @@ const profileForm = reactive({
   credentialUrl: '',
 })
 
-const isExpert = computed(() => {
-  return appStore.role === '专家'
-})
-
-const credentialFileName = computed(() => profileForm.credentialName || '')
-
-const credentialDownloadUrl = computed(() => profileForm.credentialUrl || '')
+const isExpert = computed(() => appStore.role === '专家')
 
 const editableProfile = computed(() => ({
   name: profileForm.name,
@@ -247,18 +253,17 @@ const avatarText = computed(() => {
 
 const avatarSrc = computed(() => {
   const rawAvatar = profileForm.avatar || appStore.userInfo?.avatar || ''
-
   if (!rawAvatar || typeof rawAvatar !== 'string') return ''
 
   const normalizedAvatar = rawAvatar.trim()
   if (!normalizedAvatar) return ''
 
-  if (normalizedAvatar.startsWith('data:image')) {
-    return normalizedAvatar
-  }
-
+  if (normalizedAvatar.startsWith('data:image')) return normalizedAvatar
   return `data:image/png;base64,${normalizedAvatar}`
 })
+
+const credentialFileName = computed(() => profileForm.credentialName || '')
+const credentialDownloadUrl = computed(() => profileForm.credentialUrl || '')
 
 const infoSummary = computed(() => ({
   joinDays: appStore.userInfo?.joinDays || 128,
@@ -304,19 +309,27 @@ const securityItems = computed(() => [
 function fillProfileForm() {
   const userInfo = appStore.userInfo || {}
 
-  profileForm.name = userInfo.nickname || ''
+  profileForm.name = userInfo.nickname || userInfo.name || ''
   profileForm.username = userInfo.username || ''
   profileForm.phone = userInfo.phone || ''
   profileForm.email = userInfo.email || ''
-  profileForm.location = userInfo.location || userInfo.city || ''
+  profileForm.location = userInfo.location || userInfo.city || userInfo.address || ''
   profileForm.bio = userInfo.bio || userInfo.signature || ''
   profileForm.avatar = userInfo.avatar || ''
-  profileForm.role = appStore.role,
+  profileForm.role = appStore.role
   profileForm.credentialName = userInfo.credentialName || userInfo.authFileName || ''
   profileForm.credentialUrl = userInfo.credentialUrl || userInfo.authFileUrl || ''
 }
 
 fillProfileForm()
+
+watch(
+  () => appStore.userInfo,
+  () => {
+    fillProfileForm()
+  },
+  { deep: true }
+)
 
 function openEditDialog() {
   editDialogVisible.value = true
@@ -327,7 +340,7 @@ function handleProfileSave(payload) {
 
   appStore.setUserInfo({
     ...(appStore.userInfo || {}),
-    name: payload.name,
+    nickname: payload.name,
     username: payload.username,
     phone: payload.phone,
     email: payload.email,
@@ -335,7 +348,6 @@ function handleProfileSave(payload) {
     stage: payload.stage,
     bio: payload.bio,
     avatar: payload.avatar,
-    role: payload.role,
     credentialName: payload.credentialName,
     credentialUrl: payload.credentialUrl,
   })
@@ -345,7 +357,6 @@ function handleProfileSave(payload) {
 
 function downloadCredential() {
   if (!credentialDownloadUrl.value) return
-
   window.open(credentialDownloadUrl.value, '_blank', 'noopener')
 }
 
@@ -374,6 +385,70 @@ async function handleNavClick(key) {
   }
 
   ElMessage.info('该模块当前为静态展示')
+}
+
+function beforeAvatarUpload(file) {
+  const isImage = typeof file?.type === 'string' && file.type.startsWith('image/')
+  if (!isImage) {
+    ElMessage.error('仅支持上传图片格式')
+    return false
+  }
+
+  const maxSizeMb = 5
+  const isLt5M = typeof file?.size === 'number' ? file.size / 1024 / 1024 < maxSizeMb : true
+  if (!isLt5M) {
+    ElMessage.error(`图片大小不能超过 ${maxSizeMb}MB`)
+    return false
+  }
+
+  return true
+}
+
+function blobToDataUrl(blob) {
+  const normalizedBlob =
+    blob && typeof blob === 'object' && blob.type === 'application/octet-stream'
+      ? new Blob([blob], { type: 'image/png' })
+      : blob
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('读取头像失败'))
+    reader.readAsDataURL(normalizedBlob)
+  })
+}
+
+async function uploadAvatarRequest(options) {
+  const file = options?.file
+  if (!file) {
+    options?.onError?.(new Error('未选择文件'))
+    return
+  }
+
+  try {
+    const result = await uploadAvatar(file)
+
+    try {
+      const avatarBlob = await getAvatar()
+      if (avatarBlob && typeof avatarBlob === 'object' && typeof avatarBlob.size === 'number' && avatarBlob.size > 0) {
+        const avatarDataUrl = await blobToDataUrl(avatarBlob)
+        if (avatarDataUrl) {
+          profileForm.avatar = avatarDataUrl
+          appStore.setUserInfo({
+            ...(appStore.userInfo || {}),
+            avatar: avatarDataUrl,
+          })
+        }
+      }
+    } catch (error) {
+    }
+
+    options?.onSuccess?.(result)
+    ElMessage.success('头像已更新')
+  } catch (error) {
+    options?.onError?.(error)
+    ElMessage.error(error?.message || '头像上传失败')
+  }
 }
 </script>
 
@@ -487,19 +562,29 @@ async function handleNavClick(key) {
   width: 96px;
   height: 96px;
   flex-shrink: 0;
+  border: 4px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+.avatar-uploader {
+  display: inline-flex;
+}
+
+.avatar-uploader :deep(.el-upload) {
+  display: inline-flex;
 }
 
 .avatar-image,
 .avatar-fallback {
-  width: 96px;
-  height: 96px;
+  width: 100%;
+  height: 100%;
   border-radius: 999px;
 }
 
 .avatar-image {
   object-fit: cover;
-  border: 4px solid #fff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
 }
 
 .avatar-fallback {
@@ -509,7 +594,30 @@ async function handleNavClick(key) {
   color: #fff;
   font-size: 32px;
   font-weight: 800;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.avatar-wrap:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: -4px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.avatar-overlay-text {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .hero-content {
