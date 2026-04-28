@@ -3,8 +3,8 @@ import { getAvatar, getCurrentUser } from '@/api/user'
 
 const objMap = {
   1: '普通用户',
-  2: '管理员',
-  3: '专家'
+  2: '专家',
+  3: '管理员'
 }
 
 const defaultState = () => ({
