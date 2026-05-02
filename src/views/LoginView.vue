@@ -56,15 +56,40 @@
           />
         </el-form-item>
 
-        <el-form-item label="确认密码" prop="confirmPassword">
-          <el-input
-            v-model.trim="registerForm.confirmPassword"
-            type="password"
-            show-password
-            placeholder="请再次输入密码"
-            autocomplete="new-password"
-            @keyup.enter="onRegister"
-          />
+        <el-form-item label="昵称" prop="nickname">
+          <el-input v-model.trim="registerForm.nickname" placeholder="请输入昵称" autocomplete="nickname" />
+        </el-form-item>
+
+        <el-form-item label="电话" prop="phone">
+          <el-input v-model.trim="registerForm.phone" placeholder="请输入电话" autocomplete="tel" />
+        </el-form-item>
+
+        <el-form-item label="角色" prop="role">
+          <el-radio-group v-model="registerForm.role" @change="onRoleChange">
+            <el-radio :value="1">普通用户</el-radio>
+            <el-radio :value="2">专家</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item v-if="registerForm.role === 2" label="认证材料" prop="certFile">
+          <el-upload
+            :auto-upload="false"
+            :limit="1"
+            :show-file-list="true"
+            :on-change="onCertFileChange"
+            :on-remove="onCertFileRemove"
+            :before-upload="beforeCertFileUpload"
+            accept=".doc,.docx,.pdf"
+          >
+            <el-button type="primary">选择文件</el-button>
+            <template #tip>
+              <div class="el-upload__tip">仅支持 doc / docx / pdf</div>
+            </template>
+          </el-upload>
+        </el-form-item>
+
+        <el-form-item label="邮箱（可选）" prop="email">
+          <el-input v-model.trim="registerForm.email" placeholder="请输入邮箱" autocomplete="email" />
         </el-form-item>
 
         <div v-if="error" class="error">{{ error }}</div>
@@ -104,26 +129,16 @@ const loginForm = reactive({
 const registerForm = reactive({
   username: '',
   password: '',
-  confirmPassword: '',
+  nickname: '',
+  phone: '',
+  role: 1,
+  email: '',
+  certFile: null,
 })
 
 const loginRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-}
-
-const validateConfirmPassword = (_, value, callback) => {
-  if (!value) {
-    callback(new Error('请再次输入密码'))
-    return
-  }
-
-  if (value !== registerForm.password) {
-    callback(new Error('两次输入的密码不一致'))
-    return
-  }
-
-  callback()
 }
 
 const registerRules = {
@@ -135,7 +150,38 @@ const registerRules = {
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码至少 6 位', trigger: 'blur' },
   ],
-  confirmPassword: [{ validator: validateConfirmPassword, trigger: 'blur' }],
+  nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }],
+  phone: [
+    { required: true, message: '请输入电话', trigger: 'blur' },
+    { pattern: /^\d{6,20}$/, message: '电话格式不正确', trigger: 'blur' },
+  ],
+  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
+  certFile: [
+    {
+      required: true,
+      validator: (_, value, callback) => {
+        if (registerForm.role === 2 && !value) {
+          callback(new Error('请上传认证材料'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change',
+    },
+  ],
+  email: [
+    {
+      validator: (_, value, callback) => {
+        if (!value) {
+          callback()
+          return
+        }
+        const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+        callback(ok ? undefined : new Error('邮箱格式不正确'))
+      },
+      trigger: 'blur',
+    },
+  ],
 }
 
 function resetError() {
@@ -145,6 +191,45 @@ function resetError() {
 function switchForm(type) {
   formType.value = type
   resetError()
+}
+
+function onRoleChange() {
+  if (registerForm.role !== 2) {
+    registerForm.certFile = null
+    registerFormRef.value?.clearValidate?.(['certFile'])
+  }
+}
+
+function beforeCertFileUpload(file) {
+  const name = String(file?.name || '').toLowerCase()
+  const ok = name.endsWith('.doc') || name.endsWith('.docx') || name.endsWith('.pdf')
+  if (!ok) {
+    ElMessage.error('仅支持 doc / docx / pdf 文件')
+  }
+  return ok
+}
+
+function onCertFileChange(uploadFile) {
+  const raw = uploadFile?.raw || null
+  if (!raw) {
+    registerForm.certFile = null
+    registerFormRef.value?.validateField?.('certFile')
+    return
+  }
+
+  const ok = beforeCertFileUpload(raw)
+  if (!ok) {
+    registerForm.certFile = null
+    return
+  }
+
+  registerForm.certFile = raw
+  registerFormRef.value?.validateField?.('certFile')
+}
+
+function onCertFileRemove() {
+  registerForm.certFile = null
+  registerFormRef.value?.validateField?.('certFile')
 }
 
 async function onSubmit() {
@@ -191,17 +276,29 @@ async function onRegister() {
   try {
     appStore.setLoading(true)
 
-    await register({
-      username: registerForm.username,
-      password: registerForm.password,
-    })
+    const fd = new FormData()
+    fd.append('username', registerForm.username)
+    fd.append('password', registerForm.password)
+    fd.append('nickname', registerForm.nickname)
+    fd.append('phone', registerForm.phone)
+    fd.append('role', String(registerForm.role))
+    if (registerForm.email) fd.append('email', registerForm.email)
+    if (registerForm.role === 2 && registerForm.certFile) {
+      fd.append('certificationFile', registerForm.certFile)
+    }
+
+    await register(fd)
 
     ElMessage.success('注册成功，请登录')
     loginForm.username = registerForm.username
     loginForm.password = ''
     registerForm.username = ''
     registerForm.password = ''
-    registerForm.confirmPassword = ''
+    registerForm.nickname = ''
+    registerForm.phone = ''
+    registerForm.role = 1
+    registerForm.email = ''
+    registerForm.certFile = null
     switchForm('login')
   } catch (err) {
     error.value = err?.message || '注册失败'

@@ -169,9 +169,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getAvatar, logoutRequest, uploadAvatar } from '@/api/user'
+import { getAvatar, getCurrentUserCertificationMaterial, logoutRequest, uploadAvatar } from '@/api/user'
 import { useAppStore } from '@/store/app'
 import EditPage from './components/editPage.vue'
 
@@ -267,8 +267,49 @@ const avatarSrc = computed(() => {
 const credentialFileName = computed(() => profileForm.credentialName || '')
 const credentialDownloadUrl = computed(() => profileForm.credentialUrl || '')
 
+const credentialObjectUrl = ref('')
+
+function toDate(value) {
+  if (value == null || value === '') return null
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const ms = value < 1e12 ? value * 1000 : value
+    const date = new Date(ms)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+
+    if (/^\d+$/.test(trimmed)) {
+      const num = Number(trimmed)
+      if (!Number.isFinite(num)) return null
+      const ms = num < 1e12 ? num * 1000 : num
+      const date = new Date(ms)
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+
+    const date = new Date(trimmed)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const joinDays = computed(() => {
+  const createdAt = toDate(appStore.userInfo?.createTime)
+  if (!createdAt) return 0
+
+  const diffMs = Date.now() - createdAt.getTime()
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return 0
+
+  return Math.floor(diffMs / (24 * 60 * 60 * 1000))
+})
+
 const infoSummary = computed(() => ({
-  joinDays: appStore.userInfo?.joinDays || 128,
+  joinDays: joinDays.value,
   collectionCount: appStore.userInfo?.collectionCount || 12,
   historyCount: appStore.userInfo?.historyCount || 36,
 }))
@@ -333,6 +374,60 @@ watch(
   { deep: true }
 )
 
+watch(
+  () => isExpert.value,
+  (value) => {
+    if (value) {
+      loadCertificationMaterial()
+    } else {
+      clearCertificationMaterialUrl()
+      profileForm.credentialName = ''
+      profileForm.credentialUrl = ''
+    }
+  },
+  { immediate: true }
+)
+
+function clearCertificationMaterialUrl() {
+  if (credentialObjectUrl.value) {
+    URL.revokeObjectURL(credentialObjectUrl.value)
+    credentialObjectUrl.value = ''
+  }
+}
+
+function inferCredentialFilename(blob) {
+  const type = String(blob?.type || '').toLowerCase()
+  if (type.includes('pdf')) return '认证材料.pdf'
+  if (type.includes('msword')) return '认证材料.doc'
+  if (type.includes('officedocument')) return '认证材料.docx'
+  return '认证材料'
+}
+
+async function loadCertificationMaterial() {
+  try {
+    clearCertificationMaterialUrl()
+
+    const blob = await getCurrentUserCertificationMaterial()
+    if (!blob || typeof blob !== 'object' || typeof blob.size !== 'number' || blob.size <= 0) {
+      profileForm.credentialName = ''
+      profileForm.credentialUrl = ''
+      return
+    }
+
+    const url = URL.createObjectURL(blob)
+    credentialObjectUrl.value = url
+    profileForm.credentialUrl = url
+    profileForm.credentialName = profileForm.credentialName || inferCredentialFilename(blob)
+  } catch (error) {
+    profileForm.credentialName = ''
+    profileForm.credentialUrl = ''
+  }
+}
+
+onBeforeUnmount(() => {
+  clearCertificationMaterialUrl()
+})
+
 function openEditDialog() {
   editDialogVisible.value = true
 }
@@ -359,7 +454,14 @@ function handleProfileSave(payload) {
 
 function downloadCredential() {
   if (!credentialDownloadUrl.value) return
-  window.open(credentialDownloadUrl.value, '_blank', 'noopener')
+  const link = document.createElement('a')
+  link.href = credentialDownloadUrl.value
+  link.target = '_blank'
+  link.rel = 'noopener'
+  link.download = credentialFileName.value || '认证材料'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
 async function handleNavClick(key) {

@@ -57,3 +57,11 @@ export function getAvatar() {
     skipAuthRedirect: true
   })
 }
+
+export function getCurrentUserCertificationMaterial() {
+  return request({
+    url: '/user/certificationMaterial',
+    method: 'get',
+    responseType: 'blob',
+  })
+}

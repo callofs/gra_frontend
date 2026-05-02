@@ -29,7 +29,7 @@
           <button v-if="isLoggedIn" class="user-chip" type="button" @click="goProfile">
             <img v-if="avatarSrc" class="avatar-image" :src="avatarSrc" alt="用户头像" />
             <span v-else class="avatar-text">{{ avatarText }}</span>
-            <span class="user-name">{{ displayName }}</span>
+            <span class="user-name" :title="displayName">{{ displayNameShort }}</span>
           </button>
           <button v-if="isLoggedIn" class="logout-btn" type="button" @click="logout">退出</button>
           <button v-else class="login-btn" type="button" @click="goLogin">登录</button>
@@ -52,7 +52,17 @@ const keyword = ref('')
 const isLoggedIn = computed(() => appStore.isLoggedIn)
 
 const displayName = computed(() => {
-  return appStore.username || '游客'
+  return appStore.userInfo.nickname || appStore.username || '游客'
+})
+
+const displayNameShort = computed(() => {
+  const rawName = String(displayName.value ?? '').trim()
+  const maxLength = 6
+
+  if (!rawName) return '游客'
+  if (rawName.length <= maxLength) return rawName
+
+  return `${rawName.slice(0, maxLength)}…`
 })
 
 const avatarSrc = computed(() => {
@@ -149,7 +159,7 @@ async function logout() {
 .menu {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 8px;
   flex: 1;
   justify-content: center;
   flex-wrap: wrap;
@@ -163,10 +173,21 @@ async function logout() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.item:hover {
+  color: rgba(30, 41, 59, 1);
+  background: rgba(248, 250, 252, 1);
+  border-bottom-color: rgba(59, 130, 246, 1);
 }
 
 .item.router-link-active {
   color: rgba(30, 41, 59, 1);
+  border-bottom-color: rgba(59, 130, 246, 1);
 }
 
 .actions {
@@ -199,6 +220,10 @@ async function logout() {
   font-size: 13px;
   font-weight: 700;
   color: rgba(30, 41, 59, 1);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .logout-btn,
