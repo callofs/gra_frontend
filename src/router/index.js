@@ -32,6 +32,12 @@ const routes = [
         component: () => import('@/views/selfCenter/index.vue'),
         meta: { requiresAuth: true },
       },
+      {
+        path: 'forum',
+        name: 'forum',
+        component: () => import('@/views/forum/index.vue'),
+        meta: { public: true },
+      },
     ],
   },
   {

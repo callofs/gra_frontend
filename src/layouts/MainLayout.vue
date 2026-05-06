@@ -27,7 +27,7 @@ const isHome = computed(() => route.name === 'home')
 }
 
 .content {
-  width: min(1100px, calc(100% - 28px));
+  width: 100vw;
   margin: 18px auto;
 }
 
