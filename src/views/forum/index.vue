@@ -165,6 +165,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { getDictList } from '@/api/dict.js'
 import AppFooter from '@/components/AppFooter.vue'
 
 const loading = ref(false)
@@ -175,14 +176,7 @@ const stats = ref({
   users: '6.8k',
 })
 
-const categories = ref([
-  { key: 'all', name: '全部', count: 1286 },
-  { key: 'newborn', name: '新生儿', count: 286 },
-  { key: 'toddler', name: '幼儿成长', count: 352 },
-  { key: 'education', name: '学习教育', count: 219 },
-  { key: 'health', name: '健康护理', count: 188 },
-  { key: 'emotion', name: '情绪与沟通', count: 241 },
-])
+const categories = ref([{ key: 'all', name: '全部' }])
 
 const sortTabs = [
   { key: 'hot', name: '热门' },
@@ -234,6 +228,26 @@ const recommends = ref([
   { id: 2, name: '李老师', desc: '亲子教育顾问 · 擅长学习规划' },
   { id: 3, name: '王营养师', desc: '注册营养师 · 擅长辅食搭配' },
 ])
+
+async function getCategories() {
+  try {
+    const res = await getDictList('forum')
+
+    categories.value = [
+      { key: 'all', name: '全部' },
+      ...res.map((item) => ({
+        key: item.dictCode,
+        name: item.dictName,
+      })),
+    ]
+  } catch (error) {
+    ElMessage.error(error?.message || '获取分类失败')
+  }
+}
+
+onMounted(async () => {
+  await getCategories()
+})
 
 function resetPage() {
   page.value = 1
