@@ -70,6 +70,8 @@
           </div>
         </div>
 
+        <PostEditorDialog v-model="postEditorVisible" @submit="handlePostSubmit" />
+
         <div v-if="loading" class="state">加载中...</div>
         <div v-else-if="filteredPosts.length === 0" class="state">暂无内容</div>
 
@@ -77,7 +79,11 @@
           <article v-for="post in pagedPosts" :key="post.id" class="post">
             <div class="post-header">
               <div class="author">
-                <div class="avatar">{{ post.author.slice(0, 1) }}</div>
+                <div class="avatar">
+                  <span v-if="post.isAnonymous">匿</span>
+                  <img v-else-if="post.avatar" :src="post.avatar" alt="avatar" />
+                  <span v-else>{{ String(post.author || '').slice(0, 1) }}</span>
+                </div>
                 <div class="author-meta">
                   <div class="author-name">{{ post.author }}</div>
                   <div class="author-sub">{{ post.time }} · {{ post.categoryName }}</div>
@@ -121,9 +127,9 @@
               background
               layout="prev, pager, next"
               :page-size="pageSize"
-              :total="filteredPosts.length"
+              :total="total"
               :current-page="page"
-              @current-change="(p) => (page = p)"
+              @current-change="handlePageChange"
             />
           </div>
         </div>
@@ -165,10 +171,15 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { getDictList } from '@/api/dict.js'
+import { getForumList, uploadForum } from '@/api/forum.js'
 import AppFooter from '@/components/AppFooter.vue'
+import PostEditorDialog from '@/views/forum/components/PostEditorDialog.vue'
 
 const loading = ref(false)
+
+const router = useRouter()
 
 const stats = ref({
   topics: '1.2k',
@@ -188,8 +199,12 @@ const activeCategory = ref('all')
 const activeSort = ref('hot')
 const keyword = ref('')
 
+const postEditorVisible = ref(false)
+const postSubmitting = ref(false)
+
 const page = ref(1)
 const pageSize = 6
+const total = ref(0)
 
 const posts = ref([])
 
@@ -247,6 +262,7 @@ async function getCategories() {
 
 onMounted(async () => {
   await getCategories()
+  await fetchPosts()
 })
 
 function resetPage() {
@@ -256,6 +272,12 @@ function resetPage() {
 function selectCategory(key) {
   activeCategory.value = key
   resetPage()
+  fetchPosts()
+}
+
+function handlePageChange(p) {
+  page.value = p
+  fetchPosts()
 }
 
 function toggleFollow(post) {
@@ -269,7 +291,7 @@ function toggleCollect(post) {
 }
 
 function openPost(post) {
-  ElMessage.info(`打开帖子：${post.title}`)
+  router.push({ name: 'forum-detail', params: { id: post.id } })
 }
 
 function openTopic(topic) {
@@ -281,150 +303,99 @@ function followUser(user) {
 }
 
 function createPost() {
-  ElMessage.info('发布帖子：待接入后端接口')
+  postEditorVisible.value = true
+}
+
+async function handlePostSubmit(payload) {
+  if (postSubmitting.value) return
+
+  postSubmitting.value = true
+  try {
+    await uploadForum({
+      title: payload?.title,
+      coverImages: payload?.coverUrl,
+      tags: payload?.tags,
+      content: payload?.content,
+      sectionCode: payload?.board,
+      isAnonymous: Number(payload?.isAnonymous),
+    })
+
+    postEditorVisible.value = false
+    ElMessage.success('发布成功')
+    await fetchPosts()
+  } catch (error) {
+    ElMessage.error(error?.message || '发布失败')
+  } finally {
+    postSubmitting.value = false
+  }
 }
 
 async function fetchPosts() {
   loading.value = true
   try {
-    posts.value = makeMockPosts()
+    const res = await getForumList({
+      page: page.value,
+      size: pageSize,
+      sectionCode: activeCategory.value === 'all' ? '' : activeCategory.value,
+      keyword: keyword.value,
+    })
+
+    const records = Array.isArray(res?.records) ? res.records : []
+    total.value = typeof res?.total === 'number' ? res.total : records.length
+
+    const normalizeAvatar = (value) => {
+      if (!value) return ''
+      if (typeof value !== 'string') return ''
+
+      const trimmed = value.trim()
+      if (!trimmed) return ''
+      if (trimmed.startsWith('data:image/')) return trimmed
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) return trimmed
+      return `data:image/png;base64,${trimmed}`
+    }
+
+    posts.value = records.map((item) => ({
+      id: item.id,
+      title: item.title,
+      excerpt: String(item.content || '').replace(/<[^>]+>/g, '').slice(0, 120),
+      author: item.isAnonymous ? '匿名用户' : item.authorNickname,
+      avatar: normalizeAvatar(item.authorAvatar),
+      isAnonymous: item.isAnonymous === 1 || item.isAnonymous === true,
+      time: item.createTime ? String(item.createTime).replace('T', ' ').slice(0, 16) : '',
+      category: item.sectionCode,
+      categoryName: item.sectionName,
+      tags: [],
+      likes: item.likeCount || 0,
+      comments: item.commentCount || 0,
+      views: item.viewCount || 0,
+      shares: 0,
+      followed: false,
+      collected: false,
+    }))
   } finally {
     loading.value = false
   }
 }
 
-function makeMockPosts() {
-  return [
-    {
-      id: 1,
-      title: '宝宝夜醒频繁，怎么调整作息？',
-      excerpt: '最近宝宝半夜总是醒，可能是白天小睡安排不合理，也可能是睡前仪式没建立好。大家有什么建议？',
-      author: '小月妈',
-      time: '10 分钟前',
-      category: 'newborn',
-      categoryName: '新生儿',
-      tags: ['睡眠训练', '夜醒', '作息'],
-      likes: 128,
-      comments: 34,
-      views: 2360,
-      shares: 19,
-      followed: false,
-      collected: false,
-    },
-    {
-      id: 2,
-      title: '两岁娃挑食严重，怎么引导更有效？',
-      excerpt: '只吃面包和水果，青菜一口不碰。尝试过奖励和讲道理都没用。你们是怎么做的？',
-      author: '橙子爸',
-      time: '1 小时前',
-      category: 'toddler',
-      categoryName: '幼儿成长',
-      tags: ['挑食', '辅食', '营养'],
-      likes: 86,
-      comments: 27,
-      views: 1840,
-      shares: 8,
-      followed: true,
-      collected: false,
-    },
-    {
-      id: 3,
-      title: '幼小衔接要不要报班？我们家这样安排',
-      excerpt: '分享下我们的规划：每天 20 分钟亲子阅读 + 生活自理训练 + 游戏化数学，供大家参考。',
-      author: '豆豆妈',
-      time: '3 小时前',
-      category: 'education',
-      categoryName: '学习教育',
-      tags: ['幼小衔接', '学习习惯', '规划'],
-      likes: 214,
-      comments: 63,
-      views: 5120,
-      shares: 41,
-      followed: false,
-      collected: true,
-    },
-    {
-      id: 4,
-      title: '宝宝感冒咳嗽，家庭护理要注意什么？',
-      excerpt: '除了按医嘱用药，居家护理方面加湿、补水、睡姿这些细节也很重要。欢迎补充。',
-      author: '张医生',
-      time: '昨天',
-      category: 'health',
-      categoryName: '健康护理',
-      tags: ['感冒', '护理', '咳嗽'],
-      likes: 302,
-      comments: 78,
-      views: 7920,
-      shares: 66,
-      followed: false,
-      collected: false,
-    },
-    {
-      id: 5,
-      title: '孩子发脾气时，父母怎么做不升级冲突？',
-      excerpt: '先共情再设边界，情绪平复后再讨论规则。关键是稳定而一致的回应方式。',
-      author: '王老师',
-      time: '2 天前',
-      category: 'emotion',
-      categoryName: '情绪与沟通',
-      tags: ['情绪', '沟通', '规则'],
-      likes: 165,
-      comments: 49,
-      views: 4210,
-      shares: 22,
-      followed: true,
-      collected: false,
-    },
-    {
-      id: 6,
-      title: '断奶期的心理安抚：这些方法很好用',
-      excerpt: '断奶不只是停止喂奶，也需要替代性的安抚方式：拥抱、讲故事、固定的睡前仪式。',
-      author: '乐乐妈',
-      time: '3 天前',
-      category: 'toddler',
-      categoryName: '幼儿成长',
-      tags: ['断奶', '安抚', '睡前仪式'],
-      likes: 97,
-      comments: 18,
-      views: 2680,
-      shares: 12,
-      followed: false,
-      collected: false,
-    },
-    {
-      id: 7,
-      title: '新生儿肠绞痛怎么缓解？',
-      excerpt: '试过飞机抱、白噪音、热敷和排气操，效果不一。大家还有更有效的方法吗？',
-      author: '小北妈',
-      time: '4 天前',
-      category: 'newborn',
-      categoryName: '新生儿',
-      tags: ['肠绞痛', '安抚', '排气操'],
-      likes: 56,
-      comments: 21,
-      views: 1340,
-      shares: 6,
-      followed: false,
-      collected: false,
-    },
-    {
-      id: 8,
-      title: '如何培养孩子的专注力？从日常小事做起',
-      excerpt: '减少无意义的打断、建立可预期的任务流程、用游戏化方式练习等待与延迟满足。',
-      author: '李老师',
-      time: '5 天前',
-      category: 'education',
-      categoryName: '学习教育',
-      tags: ['专注力', '习惯', '游戏化'],
-      likes: 143,
-      comments: 37,
-      views: 3890,
-      shares: 28,
-      followed: false,
-      collected: false,
-    },
-  ]
-}
+// function makeMockPosts() {
+//   return [
+//     {
+//       id: 1,
+//       title: '宝宝夜醒频繁，怎么调整作息？',
+//       excerpt: '最近宝宝半夜总是醒，可能是白天小睡安排不合理，也可能是睡前仪式没建立好。大家有什么建议？',
+//       author: '小月妈',
+//       time: '10 分钟前',
+//       category: 'newborn',
+//       categoryName: '新生儿',
+//       tags: ['睡眠训练', '夜醒', '作息'],
+//       likes: 128,
+//       comments: 34,
+//       views: 2360,
+//       shares: 19,
+//       followed: false,
+//       collected: false,
+//     },
+// }
 
 onMounted(() => {
   fetchPosts()
@@ -626,12 +597,20 @@ onMounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 999px;
+  overflow: hidden;
   background: rgba(59, 130, 246, 0.12);
   color: rgba(59, 130, 246, 1);
   display: grid;
   place-items: center;
   font-weight: 900;
   flex-shrink: 0;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .avatar-sm {

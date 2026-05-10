@@ -25,6 +25,7 @@ import '@wangeditor/editor/dist/css/style.css'
 
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
+import { uploadPostImage } from '@/api/forum.js'
 
 const props = defineProps({
   modelValue: {
@@ -74,10 +75,37 @@ const toolbarConfigComputed = computed(() => props.toolbarConfig)
 const editorConfigComputed = computed(() => {
   const heightValue = typeof props.height === 'number' ? `${props.height}px` : String(props.height)
 
+  const externalMenuConf = props.editorConfig?.MENU_CONF || {}
+  const externalUploadImageConf = externalMenuConf?.uploadImage
+
+  const MENU_CONF = {
+    ...externalMenuConf,
+    uploadImage:
+      externalUploadImageConf ||
+      {
+        customUpload: async (file, insertFn) => {
+          const res = await uploadPostImage(file)
+
+          const errno = typeof res?.errno === 'number' ? res.errno : 0
+          if (errno !== 0) {
+            throw new Error(res?.message || '图片上传失败')
+          }
+
+          const url = res?.data?.url
+          if (!url || typeof url !== 'string') {
+            throw new Error('图片上传失败')
+          }
+
+          insertFn(url)
+        },
+      },
+  }
+
   return {
     placeholder: props.placeholder,
     readOnly: props.disabled,
     ...props.editorConfig,
+    MENU_CONF,
     // 基础样式统一在组件内提供
     scroll: false,
     autoFocus: false,

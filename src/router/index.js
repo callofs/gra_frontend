@@ -38,6 +38,12 @@ const routes = [
         component: () => import('@/views/forum/index.vue'),
         meta: { public: true },
       },
+      {
+        path: 'forum/:id',
+        name: 'forum-detail',
+        component: () => import('@/views/forum/ForumDetail.vue'),
+        meta: { public: true },
+      },
     ],
   },
   {
