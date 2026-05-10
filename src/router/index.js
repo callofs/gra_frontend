@@ -44,6 +44,24 @@ const routes = [
         component: () => import('@/views/forum/ForumDetail.vue'),
         meta: { public: true },
       },
+      {
+        path: 'market',
+        name: 'market',
+        component: () => import('@/views/mutualMarket/index.vue'),
+        meta: { public: true },
+      },
+      {
+        path: 'lectures',
+        name: 'lectures',
+        component: () => import('@/views/expertCoach/index.vue'),
+        meta: { public: true },
+      },
+      {
+        path: 'courses',
+        name: 'courses',
+        component: () => import('@/views/courses/index.vue'),
+        meta: { public: true },
+      },
     ],
   },
   {
