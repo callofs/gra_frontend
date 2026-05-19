@@ -1,5 +1,11 @@
 <template>
   <div class="coach-page">
+    <BookDialog v-model="bookDialogVisible" :expert="currentExpert" @submit="handleBookSubmit" />
+    <LectureBookDialog
+      v-model="lectureBookDialogVisible"
+      :lecture="currentLecture"
+      @submit="handleLectureBookSubmit"
+    />
     <section class="coach-hero">
       <div class="hero-container">
         <div class="hero-left">
@@ -110,7 +116,7 @@
 
                 <div class="lecture-footer">
                   <div class="time">{{ l.time }}</div>
-                  <el-button size="small" type="primary" @click.stop="openLecture(l)">
+                  <el-button size="small" type="primary" @click.stop="handleLectureAction(l)">
                     {{ l.ended ? '观看回放' : '立即预约' }}
                   </el-button>
                 </div>
@@ -126,6 +132,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import BookDialog from './components/BookDialog.vue'
+import LectureBookDialog from './components/LectureBookDialog.vue'
 
 const tabs = [
   { key: 'all', name: '全部专家' },
@@ -221,12 +229,35 @@ const filteredExperts = computed(() => {
 
 const lecturesAnchor = ref(null)
 
+const bookDialogVisible = ref(false)
+const currentExpert = ref(null)
+
+const lectureBookDialogVisible = ref(false)
+const currentLecture = ref(null)
+
 function handleBook(expert) {
-  if (expert?.name) {
-    ElMessage.info(`预约专家：${expert.name}（待接入后端）`)
+  currentExpert.value = expert ?? null
+  bookDialogVisible.value = true
+}
+
+function handleBookSubmit(payload) {
+  const expertName = payload?.expert?.name
+  ElMessage.success(expertName ? `已提交预约：${expertName}（待接入后端）` : '已提交预约（待接入后端）')
+}
+
+function handleLectureAction(lecture) {
+  if (lecture?.ended) {
+    openLecture(lecture)
     return
   }
-  ElMessage.info('预约专家：待接入后端')
+
+  currentLecture.value = lecture ?? null
+  lectureBookDialogVisible.value = true
+}
+
+function handleLectureBookSubmit(payload) {
+  const title = payload?.lecture?.title
+  ElMessage.success(title ? `已提交讲座预约：${title}（待接入后端）` : '已提交讲座预约（待接入后端）')
 }
 
 function scrollToLectures() {

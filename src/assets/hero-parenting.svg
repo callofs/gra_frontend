@@ -1,0 +1,65 @@
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6" stop-opacity="0.18" />
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0.14" />
+    </linearGradient>
+    <radialGradient id="glow1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(340 220) rotate(90) scale(260 360)">
+      <stop stop-color="#3B82F6" stop-opacity="0.35" />
+      <stop offset="1" stop-color="#3B82F6" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="glow2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(860 380) rotate(90) scale(240 340)">
+      <stop stop-color="#22D3EE" stop-opacity="0.32" />
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFFFFF" stop-opacity="0.95" />
+      <stop offset="1" stop-color="#F8FAFC" stop-opacity="0.9" />
+    </linearGradient>
+    <filter id="shadow" x="-50" y="-50" width="1300" height="800" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.10" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="700" rx="36" fill="url(#bg)" />
+  <rect width="1200" height="700" rx="36" fill="url(#glow1)" />
+  <rect width="1200" height="700" rx="36" fill="url(#glow2)" />
+
+  <g filter="url(#shadow)">
+    <rect x="110" y="120" width="980" height="460" rx="28" fill="url(#card)" stroke="#E2E8F0" />
+  </g>
+
+  <!-- Simple family illustration -->
+  <g>
+    <circle cx="520" cy="290" r="58" fill="#FDE68A" />
+    <circle cx="700" cy="300" r="46" fill="#FDE68A" />
+    <circle cx="610" cy="335" r="36" fill="#FDE68A" />
+
+    <path d="M450 470c20-70 70-110 140-110s120 40 140 110" fill="#93C5FD" />
+    <path d="M620 465c10-55 45-88 88-88s78 33 88 88" fill="#67E8F9" />
+    <path d="M532 470c8-40 32-66 60-66s52 26 60 66" fill="#A7F3D0" />
+
+    <circle cx="495" cy="280" r="8" fill="#0F172A" fill-opacity="0.65" />
+    <circle cx="545" cy="280" r="8" fill="#0F172A" fill-opacity="0.65" />
+    <path d="M508 308c12 14 30 14 42 0" stroke="#0F172A" stroke-opacity="0.55" stroke-width="6" stroke-linecap="round" />
+
+    <circle cx="685" cy="295" r="6" fill="#0F172A" fill-opacity="0.65" />
+    <circle cx="720" cy="295" r="6" fill="#0F172A" fill-opacity="0.65" />
+    <path d="M695 318c9 10 22 10 31 0" stroke="#0F172A" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round" />
+
+    <circle cx="598" cy="332" r="5" fill="#0F172A" fill-opacity="0.65" />
+    <circle cx="624" cy="332" r="5" fill="#0F172A" fill-opacity="0.65" />
+    <path d="M604 350c7 8 16 8 23 0" stroke="#0F172A" stroke-opacity="0.55" stroke-width="4" stroke-linecap="round" />
+  </g>
+
+  <!-- Decorative UI-like chips -->
+  <g opacity="0.95">
+    <rect x="190" y="170" width="190" height="46" rx="14" fill="#FFFFFF" stroke="#E2E8F0" />
+    <circle cx="214" cy="193" r="10" fill="#3B82F6" fill-opacity="0.8" />
+    <rect x="236" y="185" width="122" height="16" rx="8" fill="#CBD5E1" fill-opacity="0.9" />
+
+    <rect x="820" y="185" width="190" height="46" rx="14" fill="#FFFFFF" stroke="#E2E8F0" />
+    <circle cx="844" cy="208" r="10" fill="#22D3EE" fill-opacity="0.75" />
+    <rect x="866" y="200" width="122" height="16" rx="8" fill="#CBD5E1" fill-opacity="0.9" />
+  </g>
+</svg>

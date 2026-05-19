@@ -51,6 +51,12 @@ const routes = [
         meta: { public: true },
       },
       {
+        path: 'market/:id',
+        name: 'market-detail',
+        component: () => import('@/views/mutualMarket/ItemDetail.vue'),
+        meta: { public: true },
+      },
+      {
         path: 'lectures',
         name: 'lectures',
         component: () => import('@/views/expertCoach/index.vue'),
@@ -61,6 +67,18 @@ const routes = [
         name: 'courses',
         component: () => import('@/views/courses/index.vue'),
         meta: { public: true },
+      },
+      {
+        path: 'news-section',
+        name: 'news-section',
+        component: () => import('@/views/newsSection/index.vue'),
+        meta: { public: true },
+      },
+      {
+        path: 'admin',
+        name: 'admin',
+        component: () => import('@/views/admin/index.vue'),
+        meta: { requiresAuth: true, requiresAdmin: true },
       },
     ],
   },
@@ -94,6 +112,11 @@ router.beforeEach(async (to) => {
   if (to.meta?.requiresAuth && !isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
+
+  if (to.meta?.requiresAdmin && appStore.role !== '管理员') {
+    return { name: 'home', query: { denied: 'admin' } }
+  }
+
   return true
 })
 

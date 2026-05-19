@@ -357,6 +357,7 @@ async function fetchPosts() {
     posts.value = records.map((item) => ({
       id: item.id,
       title: item.title,
+      userId: item.userId,
       excerpt: String(item.content || '').replace(/<[^>]+>/g, '').slice(0, 120),
       author: item.isAnonymous ? '匿名用户' : item.authorNickname,
       avatar: normalizeAvatar(item.authorAvatar),

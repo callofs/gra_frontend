@@ -1,5 +1,6 @@
 <template>
   <div class="courses-page">
+    <EnrollDialog v-model="enrollDialogVisible" :course="currentCourse" @submit="handleEnrollSubmit" />
     <section class="courses-hero">
       <div class="hero-container">
         <div class="hero-left">
@@ -114,6 +115,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import EnrollDialog from './components/EnrollDialog.vue'
 
 const tabs = [
   { key: 'all', name: '全部课程' },
@@ -135,7 +137,7 @@ const courses = ref([
     instructorAvatar: 'https://picsum.photos/seed/ca1/100/100',
     level: '入门',
     duration: '共 12 讲 · 2.5 小时',
-    priceText: '¥ 49.9',
+    priceText: '免费',
     cover: 'https://picsum.photos/seed/cc1/900/600',
   },
   {
@@ -147,7 +149,7 @@ const courses = ref([
     instructorAvatar: 'https://picsum.photos/seed/ca2/100/100',
     level: '进阶',
     duration: '共 16 讲 · 3.2 小时',
-    priceText: '¥ 79.0',
+    priceText: '免费',
     cover: 'https://picsum.photos/seed/cc2/900/600',
   },
   {
@@ -159,7 +161,7 @@ const courses = ref([
     instructorAvatar: 'https://picsum.photos/seed/ca3/100/100',
     level: '进阶',
     duration: '共 10 讲 · 2.0 小时',
-    priceText: '¥ 69.0',
+    priceText: '免费',
     cover: 'https://picsum.photos/seed/cc3/900/600',
   },
   {
@@ -171,7 +173,7 @@ const courses = ref([
     instructorAvatar: 'https://picsum.photos/seed/ca4/100/100',
     level: '入门',
     duration: '共 14 讲 · 2.8 小时',
-    priceText: '¥ 59.0',
+    priceText: '免费',
     cover: 'https://picsum.photos/seed/cc4/900/600',
   },
 ])
@@ -205,6 +207,9 @@ const filteredCourses = computed(() => {
 const coursesAnchor = ref(null)
 const topicsAnchor = ref(null)
 
+const enrollDialogVisible = ref(false)
+const currentCourse = ref(null)
+
 function scrollToCourses() {
   const el = coursesAnchor.value
   if (!el) return
@@ -226,7 +231,13 @@ function openCourse(course) {
 }
 
 function enrollCourse(course) {
-  ElMessage.success(`报名课程：${course.title}（待接入后端）`)
+  currentCourse.value = course ?? null
+  enrollDialogVisible.value = true
+}
+
+function handleEnrollSubmit(payload) {
+  const title = payload?.course?.title
+  ElMessage.success(title ? `已提交报名：${title}（待接入后端）` : '已提交报名（待接入后端）')
 }
 
 function openTopic(topic) {

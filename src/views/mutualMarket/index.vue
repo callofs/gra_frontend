@@ -1,5 +1,7 @@
 <template>
   <div class="market-page">
+    <PublishDialog v-model="publishVisible" @submitted="handlePublishSubmitted" />
+
     <section class="market-hero">
       <div class="hero-container">
         <div class="hero-left">
@@ -146,6 +148,11 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { mockItems } from './mockItems'
+import PublishDialog from './components/PublishDialog.vue'
+
+const router = useRouter()
 
 const categories = [
   { key: 'all', name: '全部物品', count: '3.5w' },
@@ -173,125 +180,9 @@ const priceMax = ref('')
 const page = ref(1)
 const pageSize = 8
 
-const items = ref([
-  {
-    id: 1,
-    category: 'baby',
-    name: '婴儿推车可折叠',
-    desc: '轻便好推，适合 0-3 岁，收纳不占空间。',
-    price: 159,
-    originPrice: 499,
-    condition: '8成新',
-    image: 'https://picsum.photos/seed/mm1/600/400',
-    sellerName: '吴先生',
-    sellerAvatar: 'https://picsum.photos/seed/av1/80/80',
-    location: '顺义区',
-  },
-  {
-    id: 2,
-    category: 'toy',
-    name: '益智积木套装',
-    desc: '多种造型，安全无味，培养空间思维。',
-    price: 69,
-    originPrice: 199,
-    condition: '9成新',
-    image: 'https://picsum.photos/seed/mm2/600/400',
-    sellerName: '李女士',
-    sellerAvatar: 'https://picsum.photos/seed/av2/80/80',
-    location: '海淀区',
-  },
-  {
-    id: 3,
-    category: 'clothes',
-    name: '儿童羽绒服 110',
-    desc: '保暖轻便，无破损，干净无污渍。',
-    price: 120,
-    originPrice: 399,
-    condition: '8成新',
-    image: 'https://picsum.photos/seed/mm3/600/400',
-    sellerName: '周先生',
-    sellerAvatar: 'https://picsum.photos/seed/av3/80/80',
-    location: '朝阳区',
-  },
-  {
-    id: 4,
-    category: 'book',
-    name: '绘本 20 本',
-    desc: '适合 3-6 岁亲子阅读，书况良好。',
-    price: 88,
-    originPrice: 260,
-    condition: '9成新',
-    image: 'https://picsum.photos/seed/mm4/600/400',
-    sellerName: '陈女士',
-    sellerAvatar: 'https://picsum.photos/seed/av4/80/80',
-    location: '通州区',
-  },
-  {
-    id: 5,
-    category: 'furniture',
-    name: '儿童学习桌椅',
-    desc: '可调节高度，桌面无明显划痕。',
-    price: 299,
-    originPrice: 899,
-    condition: '7成新',
-    image: 'https://picsum.photos/seed/mm5/600/400',
-    sellerName: '王先生',
-    sellerAvatar: 'https://picsum.photos/seed/av5/80/80',
-    location: '昌平区',
-  },
-  {
-    id: 6,
-    category: 'travel',
-    name: '安全座椅',
-    desc: 'isofix 接口，适用 0-4 岁，配件齐全。',
-    price: 399,
-    originPrice: 1299,
-    condition: '8成新',
-    image: 'https://picsum.photos/seed/mm6/600/400',
-    sellerName: '孙女士',
-    sellerAvatar: 'https://picsum.photos/seed/av6/80/80',
-    location: '丰台区',
-  },
-  {
-    id: 7,
-    category: 'feed',
-    name: '奶瓶消毒器',
-    desc: '蒸汽消毒，使用正常，带说明书。',
-    price: 89,
-    originPrice: 269,
-    condition: '9成新',
-    image: 'https://picsum.photos/seed/mm7/600/400',
-    sellerName: '郑先生',
-    sellerAvatar: 'https://picsum.photos/seed/av7/80/80',
-    location: '大兴区',
-  },
-  {
-    id: 8,
-    category: 'other',
-    name: '婴儿背带',
-    desc: '透气舒适，解放双手，适合出行。',
-    price: 49,
-    originPrice: 169,
-    condition: '8成新',
-    image: 'https://picsum.photos/seed/mm8/600/400',
-    sellerName: '何女士',
-    sellerAvatar: 'https://picsum.photos/seed/av8/80/80',
-    location: '西城区',
-  },
-  {
-    id: 9,
-    category: 'toy',
-    name: '滑板车',
-    desc: '轮子顺滑，轻微使用痕迹。',
-    price: 109,
-    originPrice: 299,
-    condition: '8成新',
-    image: 'https://picsum.photos/seed/mm9/600/400',
-    sellerName: '邹先生',
-    sellerAvatar: 'https://picsum.photos/seed/av9/80/80',
-    location: '石景山',
-  },
-])
+const publishVisible = ref(false)
+
+const items = ref(mockItems)
 
 const filteredItems = computed(() => {
   const kw = String(keyword.value || '').trim().toLowerCase()
@@ -353,11 +244,19 @@ function applyFilters() {
 }
 
 function openItem(item) {
-  ElMessage.info(`打开物品：${item.name}`)
+  if (!item?.id) {
+    ElMessage.warning('物品信息不完整')
+    return
+  }
+  router.push(`/market/${item.id}`)
 }
 
 function handlePublish() {
-  ElMessage.info('发布闲置：待接入后端')
+  publishVisible.value = true
+}
+
+function handlePublishSubmitted(payload) {
+  ElMessage.success('已提交发布信息（待接入后端）')
 }
 </script>
 

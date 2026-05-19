@@ -11,7 +11,7 @@
           </div>
         </div>
         <div class="hero-img">
-          <div class="hero-img-inner"></div>
+          <img class="hero-img-inner" src="@/assets/hero-parenting.svg" alt="育儿成长插画" />
         </div>
       </div>
     </section>
@@ -48,6 +48,8 @@
 
     <ExpertTeamCard :experts="experts" />
 
+    <NewsSection />
+
     <AppFooter />
   </div>
 </template>
@@ -55,6 +57,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import ExpertTeamCard from '../components/ExpertTeamCard.vue'
+import NewsSection from '@/components/NewsSection.vue'
 import AppFooter from '@/components/AppFooter.vue'
 
 const router = useRouter()
@@ -190,11 +193,10 @@ function goProfile() {
 }
 
 .hero-img-inner {
-  position: absolute;
-  inset: -40px;
-  background: radial-gradient(400px 220px at 30% 30%, rgba(59, 130, 246, 0.35), transparent 60%),
-    radial-gradient(380px 240px at 75% 60%, rgba(34, 211, 238, 0.32), transparent 62%),
-    radial-gradient(300px 200px at 40% 90%, rgba(99, 102, 241, 0.22), transparent 60%);
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .section {

@@ -39,6 +39,7 @@ import { ElMessage } from 'element-plus'
 import { getAvatar, getCurrentUserCertificationMaterial, logoutRequest, uploadAvatar } from '@/api/user'
 import { useAppStore } from '@/store/app'
 import EditPage from './components/editPage.vue'
+import UtilityToolsPanel from './components/UtilityToolsPanel.vue'
 import FavoritePanel from './components/FavoritePanel.vue'
 import HistoryPanel from './components/HistoryPanel.vue'
 import DownloadPanel from './components/DownloadPanel.vue'
@@ -69,6 +70,7 @@ const navGroups = [
   {
     title: '内容管理',
     items: [
+      { key: 'utilityTools', label: '实用工具', icon: '🧰' },
       { key: 'favorite', label: '我的收藏', icon: '⭐' },
       { key: 'history', label: '浏览历史', icon: '🕘' },
       { key: 'download', label: '我的下载', icon: '⬇' },
@@ -108,6 +110,7 @@ const navComponentMap = {
   account: ProfileContentPanel,
   security: ProfileContentPanel,
   message: MessagePanel,
+  utilityTools: UtilityToolsPanel,
   favorite: FavoritePanel,
   history: HistoryPanel,
   download: DownloadPanel,
