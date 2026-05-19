@@ -78,17 +78,13 @@
         <div v-else class="post-list">
           <article v-for="post in pagedPosts" :key="post.id" class="post">
             <div class="post-header">
-              <div class="author">
-                <div class="avatar">
-                  <span v-if="post.isAnonymous">匿</span>
-                  <img v-else-if="post.avatar" :src="post.avatar" alt="avatar" />
-                  <span v-else>{{ String(post.author || '').slice(0, 1) }}</span>
-                </div>
-                <div class="author-meta">
-                  <div class="author-name">{{ post.author }}</div>
-                  <div class="author-sub">{{ post.time }} · {{ post.categoryName }}</div>
-                </div>
-              </div>
+              <AuthorInfo
+                :user-id="post.userId"
+                :avatar="post.avatar"
+                :nickname="post.author"
+                :anonymous="post.isAnonymous"
+                :subtitle="`${post.time} · ${post.categoryName}`"
+              />
 
               <el-button
                 :type="post.followed ? 'info' : 'primary'"
@@ -175,6 +171,7 @@ import { useRouter } from 'vue-router'
 import { getDictList } from '@/api/dict.js'
 import { getForumList, uploadForum } from '@/api/forum.js'
 import AppFooter from '@/components/AppFooter.vue'
+import AuthorInfo from '@/components/AuthorInfo.vue'
 import PostEditorDialog from '@/views/forum/components/PostEditorDialog.vue'
 
 const loading = ref(false)
@@ -588,46 +585,9 @@ onMounted(() => {
   gap: 12px;
 }
 
-.author {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(59, 130, 246, 0.12);
-  color: rgba(59, 130, 246, 1);
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  flex-shrink: 0;
-}
-
-.avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
 .avatar-sm {
   width: 34px;
   height: 34px;
-}
-
-.author-name {
-  font-weight: 900;
-  color: rgba(30, 41, 59, 1);
-}
-
-.author-sub {
-  margin-top: 2px;
-  font-size: 12px;
-  color: rgba(100, 116, 139, 1);
 }
 
 .post-body {

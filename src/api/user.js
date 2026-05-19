@@ -35,6 +35,7 @@ export function logoutRequest() {
   })
 }
 
+// 上传头像
 export function uploadAvatar(file) {
   const formData = new FormData()
   formData.append('file', file)
@@ -49,6 +50,7 @@ export function uploadAvatar(file) {
   })
 }
 
+// 获取头像
 export function getAvatar() {
   return request({
     url: '/user/getAvatar',
@@ -58,10 +60,19 @@ export function getAvatar() {
   })
 }
 
+// 获取当前用户的认证材料
 export function getCurrentUserCertificationMaterial() {
   return request({
     url: '/user/certificationMaterial',
     method: 'get',
     responseType: 'blob',
+  })
+}
+
+// 根据id获取用户信息
+export function getUserById(userId) {
+  return request({
+    url: `/user/getUserById/${userId}`,
+    method: 'get',
   })
 }

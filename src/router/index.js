@@ -33,6 +33,12 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'profile/:userId',
+        name: 'user-detail',
+        component: () => import('@/views/selfCenter/UserDetail.vue'),
+        meta: { public: true },
+      },
+      {
         path: 'forum',
         name: 'forum',
         component: () => import('@/views/forum/index.vue'),
@@ -73,6 +79,12 @@ const routes = [
         name: 'news-section',
         component: () => import('@/views/newsSection/index.vue'),
         meta: { public: true },
+      },
+      {
+        path: 'chat',
+        name: 'chat',
+        component: () => import('@/views/chat/index.vue'),
+        meta: { requiresAuth: true },
       },
       {
         path: 'admin',
