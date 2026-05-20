@@ -98,6 +98,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { createPrivateMessageSocket, getPrivateMessageSocket } from '@/api/chat'
 import { getUserById } from '@/api/user'
 
 const route = useRoute()
@@ -182,6 +183,15 @@ function formatDateTime(value) {
   return String(value).replace('T', ' ').slice(0, 19)
 }
 
+function ensurePrivateMessageConnection() {
+  const socket = getPrivateMessageSocket()
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    return socket
+  }
+
+  return createPrivateMessageSocket()
+}
+
 async function fetchUserDetail() {
   const userId = route.params.userId
   if (!userId) {
@@ -222,6 +232,11 @@ watch(
 function startChat() {
   const targetUserId = userInfo.value.id || route.params.userId
   if (!targetUserId) return
+
+  try {
+    ensurePrivateMessageConnection()
+  } catch (error) {
+  }
 
   router.push({
     name: 'chat',
