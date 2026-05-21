@@ -106,7 +106,9 @@
 
             <div class="post-footer">
               <div class="metrics">
-                <span class="metric">👍 {{ post.likes }}</span>
+                <button class="metric metric-button" type="button" :disabled="post.likeLoading" @click.stop="toggleLike(post)">
+                  {{ post.liked ? '👍 已赞' : '👍' }} {{ post.likes }}
+                </button>
                 <span class="metric">💬 {{ post.comments }}</span>
                 <span class="metric">👁️ {{ post.views }}</span>
                 <span class="metric">↗ {{ post.shares }}</span>
@@ -170,6 +172,7 @@ import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { getDictList } from '@/api/dict.js'
 import { getForumList, uploadForum } from '@/api/forum.js'
+import { getLikeStatus, like, unlike } from '@/api/like.js'
 import AppFooter from '@/components/AppFooter.vue'
 import AuthorInfo from '@/components/AuthorInfo.vue'
 import PostEditorDialog from '@/views/forum/components/PostEditorDialog.vue'
@@ -287,6 +290,41 @@ function toggleCollect(post) {
   if (post.collected) ElMessage.success('已收藏')
 }
 
+async function hydratePostLikeStatus(list) {
+  await Promise.all(
+    list.map(async (post) => {
+      try {
+        post.liked = Boolean(await getLikeStatus(1, post.id))
+      } catch (error) {
+        post.liked = false
+      }
+    })
+  )
+}
+
+async function toggleLike(post) {
+  if (!post?.id || post.likeLoading) return
+
+  post.likeLoading = true
+  try {
+    if (post.liked) {
+      await unlike({ likeType: 1, relatedId: post.id })
+      post.liked = false
+      post.likes = Math.max(0, Number(post.likes || 0) - 1)
+      ElMessage.success('已取消点赞')
+    } else {
+      await like({ likeType: 1, relatedId: post.id })
+      post.liked = true
+      post.likes = Number(post.likes || 0) + 1
+      ElMessage.success('点赞成功')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || (post.liked ? '取消点赞失败' : '点赞失败'))
+  } finally {
+    post.likeLoading = false
+  }
+}
+
 function openPost(post) {
   router.push({ name: 'forum-detail', params: { id: post.id } })
 }
@@ -351,7 +389,7 @@ async function fetchPosts() {
       return `data:image/png;base64,${trimmed}`
     }
 
-    posts.value = records.map((item) => ({
+    const nextPosts = records.map((item) => ({
       id: item.id,
       title: item.title,
       userId: item.userId,
@@ -369,7 +407,12 @@ async function fetchPosts() {
       shares: 0,
       followed: false,
       collected: false,
+      liked: false,
+      likeLoading: false,
     }))
+
+    await hydratePostLikeStatus(nextPosts)
+    posts.value = nextPosts
   } finally {
     loading.value = false
   }
@@ -647,6 +690,18 @@ onMounted(() => {
 .metric {
   font-size: 13px;
   color: rgba(100, 116, 139, 1);
+}
+
+.metric-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.metric-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .collect {

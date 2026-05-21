@@ -28,7 +28,9 @@
 
         <div class="metrics">
           <span class="metric">👁️ {{ post.viewCount || 0 }}</span>
-          <span class="metric">👍 {{ post.likeCount || 0 }}</span>
+          <button class="metric metric-button" type="button" :disabled="likeLoading" @click="toggleLike">
+            {{ liked ? '👍 已赞' : '👍' }} {{ post.likeCount || 0 }}
+          </button>
           <span class="metric">💬 {{ post.commentCount || 0 }}</span>
           <span class="metric">⭐ {{ post.collectCount || 0 }}</span>
         </div>
@@ -46,6 +48,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { getForumDetail } from '@/api/forum.js'
+import { getLikeStatus, like, unlike } from '@/api/like.js'
 import ForumCommentThread from '@/views/forum/components/ForumCommentThread.vue'
 
 const route = useRoute()
@@ -53,6 +56,8 @@ const router = useRouter()
 
 const loading = ref(false)
 const post = ref(null)
+const liked = ref(false)
+const likeLoading = ref(false)
 
 const authorName = computed(() => {
   if (!post.value) return ''
@@ -79,19 +84,58 @@ function goBack() {
   router.back()
 }
 
+async function fetchLikeStatus() {
+  if (!post.value?.id) {
+    liked.value = false
+    return
+  }
+
+  try {
+    liked.value = Boolean(await getLikeStatus(1, post.value.id))
+  } catch (error) {
+    liked.value = false
+  }
+}
+
+async function toggleLike() {
+  if (!post.value?.id || likeLoading.value) return
+
+  likeLoading.value = true
+  try {
+    if (liked.value) {
+      await unlike({ likeType: 1, relatedId: post.value.id })
+      liked.value = false
+      post.value.likeCount = Math.max(0, Number(post.value.likeCount || 0) - 1)
+      ElMessage.success('已取消点赞')
+    } else {
+      await like({ likeType: 1, relatedId: post.value.id })
+      liked.value = true
+      post.value.likeCount = Number(post.value.likeCount || 0) + 1
+      ElMessage.success('点赞成功')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || (liked.value ? '取消点赞失败' : '点赞失败'))
+  } finally {
+    likeLoading.value = false
+  }
+}
+
 async function fetchDetail() {
   const id = route.params?.id
   if (!id) {
     post.value = null
+    liked.value = false
     return
   }
 
   loading.value = true
   try {
     post.value = await getForumDetail(id)
+    await fetchLikeStatus()
   } catch (error) {
     ElMessage.error(error?.message || '获取贴文失败')
     post.value = null
+    liked.value = false
   } finally {
     loading.value = false
   }
@@ -186,6 +230,18 @@ onMounted(fetchDetail)
   padding: 12px 0;
   color: #475569;
   font-size: 13px;
+}
+
+.metric-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.metric-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .content :deep(img) {

@@ -16,6 +16,9 @@
         <div class="text">{{ commentText }}</div>
 
         <div class="actions">
+          <el-button text size="small" :loading="likeLoading" @click="toggleLike">
+            {{ liked ? '已赞' : '点赞' }} {{ likeCount }}
+          </el-button>
           <el-button text size="small" @click="toggleReply">回复</el-button>
           <el-button
             v-if="!repliesLoaded"
@@ -62,9 +65,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getReplies, makeComment } from '@/api/forumComment.js'
+import { getLikeStatus, like, unlike } from '@/api/like.js'
 
 defineOptions({ name: 'ForumCommentNode' })
 
@@ -88,6 +92,8 @@ defineEmits(['refresh'])
 const replyVisible = ref(false)
 const replyText = ref('')
 const replySubmitting = ref(false)
+const liked = ref(false)
+const likeLoading = ref(false)
 
 const replies = ref([])
 const repliesLoading = ref(false)
@@ -119,6 +125,46 @@ const commentTime = computed(() => {
   if (!raw) return ''
   return String(raw).replace('T', ' ').slice(0, 16)
 })
+
+const likeCount = computed(() => {
+  return Number(props.comment?.likeCount || 0)
+})
+
+async function fetchLikeStatus() {
+  if (!props.comment?.id) {
+    liked.value = false
+    return
+  }
+
+  try {
+    liked.value = Boolean(await getLikeStatus(2, props.comment.id))
+  } catch (error) {
+    liked.value = false
+  }
+}
+
+async function toggleLike() {
+  if (!props.comment?.id || likeLoading.value) return
+
+  likeLoading.value = true
+  try {
+    if (liked.value) {
+      await unlike({ likeType: 2, relatedId: props.comment.id })
+      liked.value = false
+      props.comment.likeCount = Math.max(0, Number(props.comment?.likeCount || 0) - 1)
+      ElMessage.success('已取消点赞')
+    } else {
+      await like({ likeType: 2, relatedId: props.comment.id })
+      liked.value = true
+      props.comment.likeCount = Number(props.comment?.likeCount || 0) + 1
+      ElMessage.success('点赞成功')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || (liked.value ? '取消点赞失败' : '点赞失败'))
+  } finally {
+    likeLoading.value = false
+  }
+}
 
 function toggleReply() {
   replyVisible.value = !replyVisible.value
@@ -181,6 +227,16 @@ async function loadReplies(force = false) {
 function toggleRepliesVisible() {
   repliesVisible.value = !repliesVisible.value
 }
+
+watch(
+  () => props.comment?.id,
+  () => {
+    fetchLikeStatus()
+  },
+  { immediate: true }
+)
+
+onMounted(fetchLikeStatus)
 </script>
 
 <style scoped>
