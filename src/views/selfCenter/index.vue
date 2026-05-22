@@ -50,6 +50,7 @@ import WalletPanel from './components/WalletPanel.vue'
 import HelpPanel from './components/HelpPanel.vue'
 import FeedbackPanel from './components/FeedbackPanel.vue'
 import MessagePanel from './components/MessagePanel.vue'
+import MyPostsPanel from './components/MyPostsPanel.vue'
 import ProfileContentPanel from './components/ProfileContentPanel.vue'
 
 const appStore = useAppStore()
@@ -71,6 +72,7 @@ const navGroups = [
     title: '内容管理',
     items: [
       { key: 'utilityTools', label: '实用工具', icon: '🧰' },
+      { key: 'myPosts', label: '我的贴文', icon: '📝' },
       { key: 'favorite', label: '我的收藏', icon: '⭐' },
       { key: 'history', label: '浏览历史', icon: '🕘' },
       { key: 'download', label: '我的下载', icon: '⬇' },
@@ -111,6 +113,7 @@ const navComponentMap = {
   security: ProfileContentPanel,
   message: MessagePanel,
   utilityTools: UtilityToolsPanel,
+  myPosts: MyPostsPanel,
   favorite: FavoritePanel,
   history: HistoryPanel,
   download: DownloadPanel,

@@ -24,7 +24,7 @@ export function uploadForum(params) {
   })
 }
 
-// 获取贴文列表
+// 获取贴文列表（审核通过）
 export function getForumList(params) {
   return request({
     url: '/forumPost/summary',
@@ -43,5 +43,41 @@ export function getForumDetail(id) {
   return request({
     url: `/forumPost/getForum/${id}`,
     method: 'get',
+  })
+}
+
+// 获取所有贴文列表（管理员）
+export function getAllForumList(params) {
+  return request({
+    url: '/forumPost/admin/audit/list',
+    method: 'get',
+    params: {
+      page: params?.page || 1,
+      size: params?.size || 10,
+      status: params?.status || '',
+      keyword: params?.keyword || '',
+    }
+  })
+}
+
+// 获取当前用户的所有贴文
+export function getOwnForumList(params) {
+  return request({
+    url: '/forumPost/my/audit-status',
+    method: 'get',
+    params: {
+      page: params?.page || 1,
+      size: params?.size || 10,
+    }
+  })
+}
+
+// 管理员审核贴文
+// params 包括postId和审核后贴文状态（1=已发布，2=已驳回）
+export function auditForum(params) {
+  return request({
+    url: '/forumPost/admin/audit',
+    method: 'post',
+    data: params,
   })
 }

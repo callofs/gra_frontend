@@ -7,7 +7,9 @@
       </div>
     </div>
 
-    <div class="table-list">
+    <div v-loading="loading" class="table-list">
+      <div v-if="!loading && items.length === 0" class="empty-state">暂无待展示的贴文审核数据</div>
+
       <div v-for="item in items" :key="item.id" class="table-row">
         <div class="row-main">
           <div class="row-title">{{ item.title }}</div>
@@ -15,9 +17,9 @@
         </div>
         <el-tag :type="statusTypeMap[item.status]">{{ statusLabelMap[item.status] }}</el-tag>
         <div class="row-actions">
-          <el-button size="small" @click="emit('preview', '贴文', item.title)">查看</el-button>
-          <el-button size="small" type="success" @click="emit('approve', '贴文', item.title)">通过</el-button>
-          <el-button size="small" type="warning" @click="emit('offline', item.title)">下架</el-button>
+          <el-button size="small" @click="emit('preview', item)">查看</el-button>
+          <el-button size="small" type="success" @click="emit('approve', item)">通过</el-button>
+          <el-button size="small" type="warning" @click="emit('offline', item)">下架</el-button>
         </div>
       </div>
     </div>
@@ -29,6 +31,10 @@ defineProps({
   items: {
     type: Array,
     default: () => [],
+  },
+  loading: {
+    type: Boolean,
+    default: false,
   },
   statusLabelMap: {
     type: Object,
@@ -79,6 +85,15 @@ const emit = defineEmits(['preview', 'approve', 'offline'])
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 120px;
+}
+
+.empty-state {
+  padding: 24px;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 1);
+  color: rgba(100, 116, 139, 1);
+  text-align: center;
 }
 
 .table-row {

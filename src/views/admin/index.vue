@@ -54,6 +54,7 @@
         <PostReviewPanel
           v-else-if="activeModule === 'post'"
           :items="postReviews"
+          :loading="postReviewLoading"
           :status-label-map="statusLabelMap"
           :status-type-map="statusTypeMap"
           @preview="handlePreview"
@@ -84,8 +85,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { auditForum, getAllForumList } from '@/api/forum'
 import { useAppStore } from '@/store/app'
 import CertificationReviewPanel from './components/CertificationReviewPanel.vue'
 import PostReviewPanel from './components/PostReviewPanel.vue'
@@ -93,7 +96,9 @@ import CourseReviewPanel from './components/CourseReviewPanel.vue'
 import BoardManagePanel from './components/BoardManagePanel.vue'
 
 const appStore = useAppStore()
+const router = useRouter()
 const activeModule = ref('certification')
+const postReviewLoading = ref(false)
 
 const statusLabelMap = {
   pending: '待审核',
@@ -113,11 +118,7 @@ const certifications = ref([
   { id: 3, name: '王老师', field: '家庭教育', submitTime: '2026-05-08 18:42', fileName: '教师资格证.pdf', status: 'rejected' },
 ])
 
-const postReviews = ref([
-  { id: 1, title: '孩子总是夜醒怎么办？', author: '宝妈小雨', board: '睡眠训练', reportCount: 0, status: 'pending' },
-  { id: 2, title: '分享我的辅食添加经验', author: '营养日记', board: '营养喂养', reportCount: 1, status: 'approved' },
-  { id: 3, title: '极端标题测试贴', author: '匿名用户', board: '亲子沟通', reportCount: 6, status: 'rejected' },
-])
+const postReviews = ref([])
 
 const courseReviews = ref([
   { id: 1, title: '亲子沟通训练营', instructor: '李教授', category: '心理成长', price: '免费', status: 'pending' },
@@ -181,11 +182,56 @@ const summaryCards = computed(() => [
   },
 ])
 
+function normalizeAuditStatus(status) {
+  if (status === 1 || status === '1' || status === 'approved' || status === '已发布') return 'approved'
+  if (status === 2 || status === '2' || status === 'rejected' || status === '已驳回') return 'rejected'
+  return 'pending'
+}
+
+function normalizeForumListResponse(res) {
+  return Array.isArray(res) ? res : Array.isArray(res?.records) ? res.records : Array.isArray(res?.data) ? res.data : []
+}
+
+async function fetchPostReviews() {
+  postReviewLoading.value = true
+  try {
+    const res = await getAllForumList({ page: 1, size: 50 })
+    const list = normalizeForumListResponse(res)
+    postReviews.value = list.map((item) => ({
+      ...item,
+      title: item.title || '未命名贴文',
+      author: item.isAnonymous ? '匿名用户' : item.authorNickname || item.nickname || `用户${item.userId ?? ''}`,
+      board: item.sectionName || item.sectionCode || '未分类',
+      reportCount: Number(item.reportCount || 0),
+      status: normalizeAuditStatus(item.auditStatus ?? item.status),
+    }))
+  } catch (error) {
+    postReviews.value = []
+    ElMessage.error(error?.message || '获取贴文审核列表失败')
+  } finally {
+    postReviewLoading.value = false
+  }
+}
+
 function handlePreview(type, name) {
+  if (typeof type === 'object' && type?.id) {
+    router.push({ name: 'forum-detail', params: { id: type.id } })
+    return
+  }
   ElMessage.info(`预览${type}：${name}`)
 }
 
-function handleApprove(type, name) {
+async function handleApprove(type, name) {
+  if (typeof type === 'object' && type?.id) {
+    try {
+      await auditForum({ postId: type.id, status: 1 })
+      ElMessage.success(`贴文审核通过：${type.title}`)
+      await fetchPostReviews()
+    } catch (error) {
+      ElMessage.error(error?.message || '贴文审核通过失败')
+    }
+    return
+  }
   ElMessage.success(`${type}审核通过：${name}（待接入后端）`)
 }
 
@@ -193,8 +239,18 @@ function handleReject(type, name) {
   ElMessage.warning(`${type}已驳回：${name}（待接入后端）`)
 }
 
-function handleOffline(name) {
-  ElMessage.warning(`贴文已下架：${name}（待接入后端）`)
+async function handleOffline(item) {
+  if (item?.id) {
+    try {
+      await auditForum({ postId: item.id, status: 2 })
+      ElMessage.success(`贴文已驳回：${item.title}`)
+      await fetchPostReviews()
+    } catch (error) {
+      ElMessage.error(error?.message || '贴文驳回失败')
+    }
+    return
+  }
+  ElMessage.warning(`贴文已下架：${item}（待接入后端）`)
 }
 
 function handleCreateBoard() {
@@ -209,6 +265,10 @@ function handleToggleBoard(item) {
   item.enabled = !item.enabled
   ElMessage.success(`${item.name}${item.enabled ? '已启用' : '已停用'}（前端演示）`)
 }
+
+onMounted(() => {
+  fetchPostReviews()
+})
 </script>
 
 <style scoped>
