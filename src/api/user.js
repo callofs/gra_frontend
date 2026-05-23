@@ -76,3 +76,41 @@ export function getUserById(userId) {
     method: 'get',
   })
 }
+
+// 关注用户
+export function followUser(userId) {
+  return request({
+    url: '/user/follow',
+    method: 'post',
+    params: {
+      followedId: userId
+    }
+  })
+}
+
+// 取消关注用户
+export function unfollowUser(userId) {
+  return request({
+    url: '/user/unfollow',
+    method: 'post',
+    params: {
+      followedId: userId,
+    }
+  })
+}
+
+// 获取我的关注
+export function getMyFollows() {
+  return request({
+    url: '/user/my/follows',
+    method: 'get',
+  })
+}
+
+// 获取我的粉丝
+export function getMyFollowers() {
+  return request({
+    url: '/user/my/followers',
+    method: 'get',
+  })
+}

@@ -90,6 +90,7 @@
                 :type="post.followed ? 'info' : 'primary'"
                 plain
                 size="small"
+                :loading="post.followLoading"
                 @click="toggleFollow(post)"
               >
                 {{ post.followed ? '已关注' : '关注' }}
@@ -114,8 +115,8 @@
                 <span class="metric">↗ {{ post.shares }}</span>
               </div>
 
-              <button class="collect" type="button" @click="toggleCollect(post)">
-                {{ post.collected ? '已收藏' : '收藏' }}
+              <button class="collect" type="button" :disabled="post.collectLoading" @click="toggleCollect(post)">
+                {{ post.collected ? '取消收藏' : '收藏' }}
               </button>
             </div>
           </article>
@@ -155,7 +156,7 @@
                   <div class="recommend-sub">{{ u.desc }}</div>
                 </div>
               </div>
-              <el-button type="primary" plain size="small" @click="followUser(u)">关注</el-button>
+              <el-button type="primary" plain size="small" @click="follow(u)">关注</el-button>
             </div>
           </div>
         </div>
@@ -171,8 +172,9 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { getDictList } from '@/api/dict.js'
-import { getForumList, uploadForum } from '@/api/forum.js'
+import { collectForum, getForumList, uncollectForum, uploadForum } from '@/api/forum.js'
 import { getLikeStatus, like, unlike } from '@/api/like.js'
+import { followUser, unfollowUser } from '@/api/user.js'
 import AppFooter from '@/components/AppFooter.vue'
 import AuthorInfo from '@/components/AuthorInfo.vue'
 import PostEditorDialog from '@/views/forum/components/PostEditorDialog.vue'
@@ -280,14 +282,46 @@ function handlePageChange(p) {
   fetchPosts()
 }
 
-function toggleFollow(post) {
-  post.followed = !post.followed
-  if (post.followed) ElMessage.success('已关注该作者')
+async function toggleFollow(post) {
+  if (!post?.userId || post.followLoading) return
+
+  post.followLoading = true
+  try {
+    if (post.followed) {
+      await unfollowUser(post.userId)
+      post.followed = false
+      ElMessage.success('已取消关注')
+    } else {
+      await followUser(post.userId)
+      post.followed = true
+      ElMessage.success('已关注该作者')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || (post.followed ? '取消关注失败' : '关注失败'))
+  } finally {
+    post.followLoading = false
+  }
 }
 
-function toggleCollect(post) {
-  post.collected = !post.collected
-  if (post.collected) ElMessage.success('已收藏')
+async function toggleCollect(post) {
+  if (!post?.id || post.collectLoading) return
+
+  post.collectLoading = true
+  try {
+    if (post.collected) {
+      await uncollectForum(post.id)
+      post.collected = false
+      ElMessage.success('已取消收藏')
+    } else {
+      await collectForum(post.id)
+      post.collected = true
+      ElMessage.success('已收藏')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || (post.collected ? '取消收藏失败' : '收藏失败'))
+  } finally {
+    post.collectLoading = false
+  }
 }
 
 async function hydratePostLikeStatus(list) {
@@ -333,7 +367,7 @@ function openTopic(topic) {
   ElMessage.info(`打开话题：${topic.name}`)
 }
 
-function followUser(user) {
+function follow(user) {
   ElMessage.success(`已关注：${user.name}`)
 }
 
@@ -405,8 +439,10 @@ async function fetchPosts() {
       comments: item.commentCount || 0,
       views: item.viewCount || 0,
       shares: 0,
-      followed: false,
-      collected: false,
+      followed: item?.followed || false,
+      followLoading: false,
+      collected: item?.collected || false,
+      collectLoading: false,
       liked: false,
       likeLoading: false,
     }))
@@ -579,6 +615,11 @@ onMounted(() => {
   cursor: pointer;
   color: rgba(30, 41, 59, 1);
   font-weight: 800;
+}
+
+.collect:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .tab.active {

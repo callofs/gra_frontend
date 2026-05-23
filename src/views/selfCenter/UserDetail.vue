@@ -40,6 +40,9 @@
             </div>
 
             <div class="hero-actions">
+              <button class="follow-btn" type="button" :disabled="followLoading" @click="toggleFollow">
+                {{ followed ? '取消关注' : '关注' }}
+              </button>
               <button class="chat-btn" type="button" @click="startChat">发起聊天</button>
             </div>
           </div>
@@ -97,15 +100,18 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { createPrivateMessageSocket, getPrivateMessageSocket } from '@/api/chat'
-import { getUserById } from '@/api/user'
+import { followUser, getUserById, unfollowUser } from '@/api/user'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const errorMessage = ref('')
 const userInfo = ref({})
+const followLoading = ref(false)
+const followed = ref(false)
 
 const roleMap = {
   1: '普通用户',
@@ -207,14 +213,38 @@ async function fetchUserDetail() {
     const res = await getUserById(userId)
     const data = res?.data ?? res ?? {}
     userInfo.value = data && typeof data === 'object' ? data : {}
+    followed.value = Boolean(userInfo.value?.followed)
     if (!userInfo.value.id) {
       errorMessage.value = '未获取到有效的用户信息。'
     }
   } catch (error) {
     userInfo.value = {}
+    followed.value = false
     errorMessage.value = error?.message || '用户信息加载失败，请稍后重试。'
   } finally {
     loading.value = false
+  }
+}
+
+async function toggleFollow() {
+  const targetUserId = userInfo.value.id || route.params.userId
+  if (!targetUserId || followLoading.value) return
+
+  followLoading.value = true
+  try {
+    if (followed.value) {
+      await unfollowUser(targetUserId)
+      followed.value = false
+      ElMessage.success('已取消关注')
+    } else {
+      await followUser(targetUserId)
+      followed.value = true
+      ElMessage.success('已关注')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || (followed.value ? '取消关注失败' : '关注失败'))
+  } finally {
+    followLoading.value = false
   }
 }
 
@@ -385,6 +415,20 @@ function goBack() {
 
 .hero-actions {
   margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.follow-btn {
+  min-width: 116px;
+  height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #0f172a;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .chat-btn {
@@ -397,6 +441,12 @@ function goBack() {
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+}
+
+.follow-btn:disabled,
+.chat-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .stat-card {

@@ -32,7 +32,9 @@
             {{ liked ? '👍 已赞' : '👍' }} {{ post.likeCount || 0 }}
           </button>
           <span class="metric">💬 {{ post.commentCount || 0 }}</span>
-          <span class="metric">⭐ {{ post.collectCount || 0 }}</span>
+          <button class="metric metric-button" type="button" :disabled="collectLoading" @click="toggleCollect">
+            {{ collected ? '⭐ 已收藏' : '⭐' }} {{ post.collectCount || 0 }}
+          </button>
         </div>
 
         <div class="content" v-html="post.content"></div>
@@ -47,7 +49,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getForumDetail } from '@/api/forum.js'
+import { collectForum, getForumDetail, uncollectForum } from '@/api/forum.js'
 import { getLikeStatus, like, unlike } from '@/api/like.js'
 import ForumCommentThread from '@/views/forum/components/ForumCommentThread.vue'
 
@@ -58,6 +60,8 @@ const loading = ref(false)
 const post = ref(null)
 const liked = ref(false)
 const likeLoading = ref(false)
+const collected = ref(false)
+const collectLoading = ref(false)
 
 const authorName = computed(() => {
   if (!post.value) return ''
@@ -120,22 +124,48 @@ async function toggleLike() {
   }
 }
 
+async function toggleCollect() {
+  if (!post.value?.id || collectLoading.value) return
+
+  collectLoading.value = true
+  try {
+    if (collected.value) {
+      await uncollectForum(post.value.id)
+      collected.value = false
+      post.value.collectCount = Math.max(0, Number(post.value.collectCount || 0) - 1)
+      ElMessage.success('已取消收藏')
+    } else {
+      await collectForum(post.value.id)
+      collected.value = true
+      post.value.collectCount = Number(post.value.collectCount || 0) + 1
+      ElMessage.success('已收藏')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || (collected.value ? '取消收藏失败' : '收藏失败'))
+  } finally {
+    collectLoading.value = false
+  }
+}
+
 async function fetchDetail() {
   const id = route.params?.id
   if (!id) {
     post.value = null
     liked.value = false
+    collected.value = false
     return
   }
 
   loading.value = true
   try {
     post.value = await getForumDetail(id)
+    collected.value = Boolean(post.value?.collected)
     await fetchLikeStatus()
   } catch (error) {
     ElMessage.error(error?.message || '获取贴文失败')
     post.value = null
     liked.value = false
+    collected.value = false
   } finally {
     loading.value = false
   }

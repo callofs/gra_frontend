@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="profile-page">
     <aside class="sidebar">
       <div class="sidebar-card">
@@ -52,6 +52,8 @@ import FeedbackPanel from './components/FeedbackPanel.vue'
 import MessagePanel from './components/MessagePanel.vue'
 import MyPostsPanel from './components/MyPostsPanel.vue'
 import ProfileContentPanel from './components/ProfileContentPanel.vue'
+import MyFollowersPanel from './components/MyFollowersPanel.vue'
+import MyFollowsPanel from './components/MyFollowsPanel.vue'
 
 const appStore = useAppStore()
 const activeNav = ref('profile')
@@ -74,6 +76,8 @@ const navGroups = [
       { key: 'utilityTools', label: '实用工具', icon: '🧰' },
       { key: 'myPosts', label: '我的贴文', icon: '📝' },
       { key: 'favorite', label: '我的收藏', icon: '⭐' },
+      { key: 'myFollows', label: '我的关注', icon: '👀' },
+      { key: 'myFollowers', label: '我的粉丝', icon: '🫶'},
       { key: 'history', label: '浏览历史', icon: '🕘' },
       { key: 'download', label: '我的下载', icon: '⬇' },
       ...(appStore.role === '管理员'
@@ -123,6 +127,8 @@ const navComponentMap = {
   wallet: WalletPanel,
   help: HelpPanel,
   feedback: FeedbackPanel,
+  myFollows: MyFollowsPanel,
+  myFollowers: MyFollowersPanel,
 }
 
 const currentViewComponent = computed(() => {

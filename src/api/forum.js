@@ -81,3 +81,49 @@ export function auditForum(params) {
     data: params,
   })
 }
+
+// 用户收藏贴文
+export function collectForum(postId) {
+  return request({
+    url: '/forumPost/collect',
+    method: 'post',
+    params: {
+      postId
+    }
+  })
+}
+
+// 取消收藏贴文
+export function uncollectForum(postId) {
+  return request({
+    url: '/forumPost/uncollect',
+    method: 'post',
+    params: {
+      postId
+    }
+  })
+}
+
+// 获取登录用户收藏列表
+export function getCollections(params) {
+  return request({
+    url: '/forumPost/my/collections',
+    method: 'get',
+    params: {
+      page: params?.page || 1,
+      size: params?.size || 10,
+    }
+  })
+}
+
+// 获取登录用户的浏览历史
+export function getBrowseHistory(params) {
+  return request({
+    url: '/forumPost/my/browse-history',
+    method: 'get',
+    params: {
+      page: params?.page || 1,
+      size: params?.size || 10,
+    }
+  })
+}
