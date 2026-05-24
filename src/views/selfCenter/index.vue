@@ -52,6 +52,7 @@ import FeedbackPanel from './components/FeedbackPanel.vue'
 import MessagePanel from './components/MessagePanel.vue'
 import MyPostsPanel from './components/MyPostsPanel.vue'
 import MyGoodsPanel from './components/MyGoodsPanel.vue'
+import ExpertSchedulePanel from './components/ExpertSchedulePanel.vue'
 import ProfileContentPanel from './components/ProfileContentPanel.vue'
 import MyFollowersPanel from './components/MyFollowersPanel.vue'
 import MyFollowsPanel from './components/MyFollowsPanel.vue'
@@ -76,6 +77,9 @@ const navGroups = [
     items: [
       { key: 'utilityTools', label: '实用工具', icon: '🧰' },
       { key: 'myPosts', label: '我的贴文', icon: '📝' },
+      ...(appStore.role === '专家'
+        ? [{ key: 'expertSchedule', label: '排班管理', icon: '🗓' }]
+        : []),
       { key: 'myGoods', label: '我的闲置物品', icon: '🛍' },
       { key: 'favorite', label: '我的收藏', icon: '⭐' },
       { key: 'myFollows', label: '我的关注', icon: '👀' },
@@ -120,6 +124,7 @@ const navComponentMap = {
   message: MessagePanel,
   utilityTools: UtilityToolsPanel,
   myPosts: MyPostsPanel,
+  expertSchedule: ExpertSchedulePanel,
   myGoods: MyGoodsPanel,
   favorite: FavoritePanel,
   history: HistoryPanel,

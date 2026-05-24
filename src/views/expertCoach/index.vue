@@ -1,10 +1,19 @@
 <template>
   <div class="coach-page">
-    <BookDialog v-model="bookDialogVisible" :expert="currentExpert" @submit="handleBookSubmit" />
+    <BookDialog
+      v-model="bookDialogVisible"
+      :expert="currentExpert"
+      :schedules="currentSchedules"
+      @submit="handleBookSubmit"
+    />
     <LectureBookDialog
       v-model="lectureBookDialogVisible"
       :lecture="currentLecture"
       @submit="handleLectureBookSubmit"
+    />
+    <PublishLectureDialog
+      v-model="publishDialogVisible"
+      @submit="handlePublishSubmit"
     />
     <section class="coach-hero">
       <div class="hero-container">
@@ -96,13 +105,21 @@
               <div class="section-title">专家讲座</div>
               <div class="section-sub">热门直播与回放，随时学习育儿知识</div>
             </div>
+            <el-button
+              v-if="isExpert"
+              class="publish-btn"
+              type="primary"
+              @click="handlePublish"
+            >
+              发布讲座
+            </el-button>
           </div>
 
           <div class="lecture-grid">
             <article v-for="l in lectures" :key="l.id" class="lecture-card" @click="openLecture(l)">
               <div class="lecture-cover">
-                <div class="lecture-tag">可回放</div>
-                <div class="play-count">已播放 {{ l.playCount }}</div>
+                <div class="lecture-tag">{{ l.statusText }}</div>
+                <div class="play-count">已报名 {{ l.currentParticipants }}/{{ l.maxSignUp }}</div>
                 <img :src="l.cover" alt="cover" />
               </div>
 
@@ -117,7 +134,7 @@
                 <div class="lecture-footer">
                   <div class="time">{{ l.time }}</div>
                   <el-button size="small" type="primary" @click.stop="handleLectureAction(l)">
-                    {{ l.ended ? '观看回放' : '立即预约' }}
+                    {{ l.ended ? '观看回放' : l.signedUp ? '取消预约' : '立即预约' }}
                   </el-button>
                 </div>
               </div>
@@ -130,10 +147,15 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import BookDialog from './components/BookDialog.vue'
 import LectureBookDialog from './components/LectureBookDialog.vue'
+import PublishLectureDialog from './components/PublishLectureDialog.vue'
+import { getLectureList, signupLecture, cancelSignup, createLecture, uploadLectureImage } from '@/api/lecture'
+import { getExpertsList } from '@/api/user'
+import { getExpertSchedules, createConsultReservation } from '@/api/consultReservation'
+import { useAppStore } from '@/store/app'
 
 const tabs = [
   { key: 'all', name: '全部专家' },
@@ -146,81 +168,9 @@ const tabs = [
 
 const activeTab = ref('all')
 
-const experts = ref([
-  {
-    id: 1,
-    type: 'pediatric',
-    name: '张医生',
-    tag: '儿科主任医师',
-    desc: '擅长儿童常见病诊疗、疫苗咨询与成长评估。',
-    hospital: '三甲医院',
-    years: 12,
-    cover: 'https://picsum.photos/seed/ex1/800/500',
-  },
-  {
-    id: 2,
-    type: 'psychology',
-    name: '李教授',
-    tag: '心理学博士',
-    desc: '专注亲子沟通、情绪管理与青春期心理辅导。',
-    hospital: '高校心理中心',
-    years: 10,
-    cover: 'https://picsum.photos/seed/ex2/800/500',
-  },
-  {
-    id: 3,
-    type: 'education',
-    name: '王老师',
-    tag: '教育名师',
-    desc: '学习习惯养成、幼小衔接与学习规划咨询。',
-    hospital: '教育机构',
-    years: 8,
-    cover: 'https://picsum.photos/seed/ex3/800/500',
-  },
-  {
-    id: 4,
-    type: 'nutrition',
-    name: '刘营养师',
-    tag: '注册营养师',
-    desc: '不同年龄段营养搭配、过敏与挑食问题指导。',
-    hospital: '营养协会',
-    years: 7,
-    cover: 'https://picsum.photos/seed/ex4/800/500',
-  },
-])
+const experts = ref([])
 
-const lectures = ref([
-  {
-    id: 1,
-    title: '不同年龄段儿童营养搭配指南，让孩子健康长高高',
-    expert: '刘营养师 · 注册营养师',
-    expertAvatar: 'https://picsum.photos/seed/lex1/100/100',
-    time: '04月18日 已结束',
-    ended: true,
-    playCount: '5.6万次',
-    cover: 'https://picsum.photos/seed/lec1/900/600',
-  },
-  {
-    id: 2,
-    title: '如何与青春期孩子有效沟通，建立良好亲子关系',
-    expert: '李教授 · 心理学博士',
-    expertAvatar: 'https://picsum.photos/seed/lex2/100/100',
-    time: '04月22日 20:00-21:30',
-    ended: false,
-    playCount: '3.2万次',
-    cover: 'https://picsum.photos/seed/lec2/900/600',
-  },
-  {
-    id: 3,
-    title: '婴幼儿常见疾病预防与家庭护理要点，一次讲清楚',
-    expert: '张医生 · 儿科主任医师',
-    expertAvatar: 'https://picsum.photos/seed/lex3/100/100',
-    time: '05月02日 19:30-21:00',
-    ended: false,
-    playCount: '2.1万次',
-    cover: 'https://picsum.photos/seed/lec3/900/600',
-  },
-])
+const lectures = ref([])
 
 const filteredExperts = computed(() => {
   if (activeTab.value === 'all') return experts.value
@@ -231,23 +181,216 @@ const lecturesAnchor = ref(null)
 
 const bookDialogVisible = ref(false)
 const currentExpert = ref(null)
+const currentSchedules = ref([])
 
 const lectureBookDialogVisible = ref(false)
 const currentLecture = ref(null)
 
+const publishDialogVisible = ref(false)
+
+const appStore = useAppStore()
+
+const isExpert = computed(() => {
+  return appStore.role === '专家'
+})
+
+onMounted(async () => {
+  await loadExperts(4)
+  await loadLectures()
+})
+
+function mapExpertType(item) {
+  const raw = String(item?.expertType || item?.type || item?.specialty || item?.field || '').toLowerCase()
+  if (raw.includes('儿') || raw.includes('pediatric')) return 'pediatric'
+  if (raw.includes('心理') || raw.includes('psychology')) return 'psychology'
+  if (raw.includes('教育') || raw.includes('teacher') || raw.includes('education')) return 'education'
+  if (raw.includes('营养') || raw.includes('nutrition')) return 'nutrition'
+  if (raw.includes('育儿') || raw.includes('parenting')) return 'parenting'
+  return 'all'
+}
+
+function mapExpertItem(item, index) {
+  const avatar = normalizeImageSource(item?.avatar)
+  return {
+    id: item?.id,
+    type: mapExpertType(item),
+    name: item?.nickname || item?.username || '专家',
+    tag: item?.certificationMaterials || item?.title || '认证专家',
+    desc: item?.bio || item?.signature || item?.introduction || '暂无专家介绍',
+    hospital: item?.company || item?.organization || item?.hospital || '平台认证专家',
+    years: item?.workYears || item?.years || item?.experienceYears || 0,
+    cover: avatar || `https://picsum.photos/seed/expert-${item?.id || index}/800/500`,
+    avatar: avatar || '',
+    raw: item,
+  }
+}
+
+async function loadExperts(limit) {
+  try {
+    const result = await getExpertsList(limit)
+    const list = Array.isArray(result) ? result : []
+    experts.value = list.map(mapExpertItem)
+  } catch (error) {
+    console.error('获取专家列表失败:', error)
+    ElMessage.error('获取专家列表失败')
+  }
+}
+
+async function loadExpertSchedules(expertId) {
+  const result = await getExpertSchedules(expertId)
+  const list = Array.isArray(result) ? result : []
+  return list.filter((item) => Number(item?.status) === 0)
+}
+
+function pickFirstImageValue(value) {
+  if (Array.isArray(value)) {
+    return value[0] || ''
+  }
+
+  return typeof value === 'string' ? value : ''
+}
+
+function normalizeImageSource(value) {
+  const imageValue = pickFirstImageValue(value)?.trim()
+
+  if (!imageValue) return ''
+  if (imageValue.startsWith('data:')) return imageValue
+  if (imageValue.startsWith('http://') || imageValue.startsWith('https://')) return imageValue
+  if (imageValue.startsWith('/')) return imageValue
+  if (/^[A-Za-z0-9+/=]+$/.test(imageValue) && imageValue.length > 100) {
+    return `data:image/jpeg;base64,${imageValue}`
+  }
+
+  return ''
+}
+
+async function loadLectures() {
+  try {
+    const res = await getLectureList(1, 10)
+    if (res && res.records) {
+      lectures.value = res.records.map((item) => {
+        const coverUrl = normalizeImageSource(item.cover)
+        const expertAvatarUrl = normalizeImageSource(item.expertAvatar)
+
+        const lectureTime = new Date(item.lectureTime)
+        const now = new Date()
+        const ended = item.status === 2 || lectureTime < now
+
+        const statusMap = {
+          0: '预告中',
+          1: '直播中',
+          2: '已结束',
+          3: '已取消'
+        }
+
+        return {
+          id: item.id,
+          title: item.title,
+          expert: item.expertName || '专家',
+          expertAvatar: expertAvatarUrl || 'https://picsum.photos/seed/lex1/100/100',
+          time: formatLectureTime(item.lectureTime),
+          ended: ended,
+          signedUp: Boolean(item.signedUp),
+          status: item.status,
+          statusText: statusMap[item.status] || '预告中',
+          currentParticipants: item.signUpCount || 0,
+          maxSignUp: item.maxSignUp || 0,
+          cover: coverUrl || 'https://picsum.photos/seed/lec1/900/600',
+          description: item.description,
+          location: item.location,
+        }
+      })
+    }
+  } catch (error) {
+    console.error('获取讲座列表失败:', error)
+    ElMessage.error('获取讲座列表失败')
+  }
+}
+
+function formatLectureTime(timeStr) {
+  if (!timeStr) return ''
+  const date = new Date(timeStr)
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${month}月${day}日 ${hours}:${minutes}`
+}
+
 function handleBook(expert) {
-  currentExpert.value = expert ?? null
-  bookDialogVisible.value = true
+  if (!expert?.id) {
+    activeTab.value = 'all'
+    ElMessage.info('请选择下方专家卡片进行预约')
+    return
+  }
+
+  openBookDialog(expert)
 }
 
-function handleBookSubmit(payload) {
-  const expertName = payload?.expert?.name
-  ElMessage.success(expertName ? `已提交预约：${expertName}（待接入后端）` : '已提交预约（待接入后端）')
+async function openBookDialog(expert) {
+  if (!expert?.id) {
+    ElMessage.warning('专家信息有误')
+    return
+  }
+
+  try {
+    const schedules = await loadExpertSchedules(expert.id)
+    if (!schedules.length) {
+      ElMessage.info('当前专家暂无可预约时段')
+      return
+    }
+
+    currentExpert.value = expert
+    currentSchedules.value = schedules
+    bookDialogVisible.value = true
+  } catch (error) {
+    console.error('获取专家排班失败:', error)
+    ElMessage.error(error?.message || '获取专家排班失败，请稍后重试')
+  }
 }
 
-function handleLectureAction(lecture) {
+async function handleBookSubmit(payload) {
+  if (!payload?.expert?.id || !payload?.form?.scheduleId) {
+    ElMessage.error('预约信息不完整')
+    return
+  }
+
+  try {
+    await createConsultReservation({
+      expertId: payload.expert.id,
+      scheduleId: payload.form.scheduleId,
+      consultType: payload.form.consultType,
+      questionDesc: payload.form.questionDesc,
+      contactInfo: payload.form.contactInfo,
+    })
+    ElMessage.success('预约提交成功，等待专家确认')
+    bookDialogVisible.value = false
+    currentSchedules.value = await loadExpertSchedules(payload.expert.id)
+  } catch (error) {
+    console.error('提交专家预约失败:', error)
+    ElMessage.error(error?.message || '预约提交失败，请稍后重试')
+  }
+}
+
+async function handleLectureAction(lecture) {
   if (lecture?.ended) {
     openLecture(lecture)
+    return
+  }
+
+  if (lecture?.signedUp) {
+    try {
+      await cancelSignup(lecture.id)
+      ElMessage.success('已取消预约')
+      await loadLectures()
+    } catch (error) {
+      console.error('取消讲座预约失败:', error)
+      if (error.response?.data?.message) {
+        ElMessage.error(error.response.data.message)
+      } else {
+        ElMessage.error('取消预约失败，请稍后重试')
+      }
+    }
     return
   }
 
@@ -255,9 +398,70 @@ function handleLectureAction(lecture) {
   lectureBookDialogVisible.value = true
 }
 
-function handleLectureBookSubmit(payload) {
-  const title = payload?.lecture?.title
-  ElMessage.success(title ? `已提交讲座预约：${title}（待接入后端）` : '已提交讲座预约（待接入后端）')
+async function handleLectureBookSubmit(payload) {
+  if (!payload?.lecture?.id) {
+    ElMessage.error('讲座信息错误')
+    return
+  }
+
+  try {
+    await signupLecture(payload.lecture.id)
+    ElMessage.success('讲座预约成功！')
+    lectureBookDialogVisible.value = false
+    await loadLectures()
+  } catch (error) {
+    console.error('讲座预约失败:', error)
+    if (error.response?.data?.message) {
+      ElMessage.error(error.response.data.message)
+    } else {
+      ElMessage.error('讲座预约失败，请稍后重试')
+    }
+  }
+}
+
+function handlePublish() {
+  publishDialogVisible.value = true
+}
+
+function resolveLectureImageKey(uploadRes) {
+  if (typeof uploadRes === 'string') return uploadRes
+
+  return uploadRes?.data?.url || ''
+}
+
+async function handlePublishSubmit(payload) {
+  try {
+    const submitPayload = {
+      title: payload?.title,
+      description: payload?.description,
+      lectureTime: payload?.lectureTime,
+      location: payload?.location,
+      maxSignUp: payload?.maxSignUp,
+    }
+
+    if (payload?.imageFile) {
+      const uploadRes = await uploadLectureImage(payload.imageFile)
+      const cover = resolveLectureImageKey(uploadRes)
+
+      if (!cover) {
+        throw new Error('讲座封面上传失败')
+      }
+
+      submitPayload.cover = cover
+    }
+
+    await createLecture(submitPayload)
+    ElMessage.success('讲座发布成功！')
+    publishDialogVisible.value = false
+    await loadLectures()
+  } catch (error) {
+    console.error('讲座发布失败:', error)
+    if (error.response?.data?.message) {
+      ElMessage.error(error.response.data.message)
+    } else {
+      ElMessage.error('讲座发布失败，请稍后重试')
+    }
+  }
 }
 
 function scrollToLectures() {
@@ -267,11 +471,12 @@ function scrollToLectures() {
 }
 
 function handleViewAll() {
-  ElMessage.info('查看全部专家：待接入后端')
+  activeTab.value = 'all'
+  loadExperts()
 }
 
 function openExpert(expert) {
-  ElMessage.info(`打开专家：${expert.name}`)
+  openBookDialog(expert)
 }
 
 function openLecture(lecture) {
@@ -416,6 +621,13 @@ function openLecture(lecture) {
   border: 1px solid rgba(226, 232, 240, 1);
   background: #fff;
   color: rgba(71, 85, 105, 1);
+}
+
+.publish-btn {
+  border-radius: 8px;
+  background: rgba(168, 85, 247, 1);
+  color: #fff;
+  font-weight: 700;
 }
 
 .expert-grid {
