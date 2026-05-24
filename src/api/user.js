@@ -114,3 +114,14 @@ export function getMyFollowers() {
     method: 'get',
   })
 }
+
+// 获取专家列表
+export function getExpertsList(limit) {
+  return request({
+    url: '/user/get/experts',
+    method: 'get',
+    params: {
+      limit
+    }
+  })
+}

@@ -1,25 +1,22 @@
 <template>
   <el-dialog v-model="visible" title="免费发布闲置" width="560px" :close-on-click-modal="false">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-      <el-form-item label="物品分类" prop="category">
-        <el-select v-model="form.category" placeholder="请选择分类" style="width: 100%">
-          <el-option label="母婴用品" value="baby" />
-          <el-option label="童装童鞋" value="clothes" />
-          <el-option label="玩具游乐" value="toy" />
-          <el-option label="图书文具" value="book" />
-          <el-option label="儿童家具" value="furniture" />
-          <el-option label="安全出行" value="travel" />
-          <el-option label="喂养用品" value="feed" />
-          <el-option label="其他" value="other" />
+      <el-form-item label="物品分类" prop="goodsTypeCode">
+        <el-select v-model="form.goodsTypeCode" placeholder="请选择分类" style="width: 100%">
+          <el-option v-for="item in categoryOptions" :key="item.key" :label="item.name" :value="item.key" />
         </el-select>
+      </el-form-item>
+
+      <el-form-item label="发布标题" prop="title">
+        <el-input v-model="form.title" placeholder="例如：九成新婴儿推车转让" maxlength="40" show-word-limit />
       </el-form-item>
 
       <el-form-item label="物品名称" prop="name">
         <el-input v-model="form.name" placeholder="例如：婴儿推车可折叠" maxlength="30" show-word-limit />
       </el-form-item>
 
-      <el-form-item label="成色" prop="condition">
-        <el-select v-model="form.condition" placeholder="请选择成色" style="width: 100%">
+      <el-form-item label="成色" prop="oldDegree">
+        <el-select v-model="form.oldDegree" placeholder="请选择成色" style="width: 100%">
           <el-option label="全新" value="全新" />
           <el-option label="9成新" value="9成新" />
           <el-option label="8成新" value="8成新" />
@@ -28,20 +25,32 @@
         </el-select>
       </el-form-item>
 
-      <el-form-item label="价格(¥)" prop="price">
-        <el-input v-model="form.price" placeholder="例如：99" />
+      <el-form-item label="适龄范围" prop="fitAge">
+        <el-input v-model="form.fitAge" placeholder="例如：0-3岁" maxlength="20" />
       </el-form-item>
 
-      <el-form-item label="描述" prop="desc">
-        <el-input v-model="form.desc" type="textarea" :rows="3" placeholder="补充使用情况、配件、适用年龄等" maxlength="120" show-word-limit />
+      <el-form-item label="尺码规格" prop="size">
+        <el-input v-model="form.size" placeholder="例如：110cm / 40*30cm" maxlength="30" />
       </el-form-item>
 
-      <el-form-item label="上传图片" prop="image">
+      <el-form-item label="适用季节" prop="season">
+        <el-input v-model="form.season" placeholder="例如：四季通用 / 冬季" maxlength="20" />
+      </el-form-item>
+
+      <el-form-item label="材质" prop="material">
+        <el-input v-model="form.material" placeholder="例如：棉质 / 塑料" maxlength="30" />
+      </el-form-item>
+
+      <el-form-item label="描述" prop="description">
+        <el-input v-model="form.description" type="textarea" :rows="3" placeholder="补充使用情况、配件、适用年龄等" maxlength="200" show-word-limit />
+      </el-form-item>
+
+      <el-form-item label="上传图片" prop="coverImages">
         <el-upload
           class="uploader"
           action="#"
           :auto-upload="false"
-          :limit="1"
+          :limit="2"
           :file-list="fileList"
           list-type="picture-card"
           accept="image/*"
@@ -53,8 +62,16 @@
         </el-upload>
       </el-form-item>
 
-      <el-form-item label="所在地区" prop="location">
-        <el-input v-model="form.location" placeholder="例如：海淀区" maxlength="10" />
+      <el-form-item label="取货方式" prop="pickUpType">
+        <el-select v-model="form.pickUpType" placeholder="请选择取货方式" style="width: 100%">
+          <el-option label="自提" :value="1" />
+          <el-option label="邮寄" :value="2" />
+          <el-option label="均可" :value="3" />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item label="所在地区" prop="address">
+        <el-input v-model="form.address" placeholder="例如：海淀区" maxlength="30" />
       </el-form-item>
     </el-form>
 
@@ -76,6 +93,10 @@ const props = defineProps({
     type: Boolean,
     required: true,
   },
+  categories: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 const emit = defineEmits(['update:modelValue', 'submitted'])
@@ -89,36 +110,33 @@ const formRef = ref(null)
 const submitting = ref(false)
 
 const fileList = ref([])
+const imageFile = ref(null)
+
+const categoryOptions = computed(() => props.categories.filter((item) => item?.key && item.key !== 'all'))
 
 const form = ref({
-  category: '',
+  goodsTypeCode: '',
+  title: '',
   name: '',
-  condition: '',
-  price: '',
-  desc: '',
-  image: '',
-  location: '',
+  oldDegree: '',
+  fitAge: '',
+  size: '',
+  season: '',
+  material: '',
+  description: '',
+  coverImages: '',
+  pickUpType: 1,
+  address: '',
 })
 
 const rules = {
-  category: [{ required: true, message: '请选择分类', trigger: 'change' }],
+  goodsTypeCode: [{ required: true, message: '请选择分类', trigger: 'change' }],
+  title: [{ required: true, message: '请输入发布标题', trigger: 'blur' }],
   name: [{ required: true, message: '请输入物品名称', trigger: 'blur' }],
-  condition: [{ required: true, message: '请选择成色', trigger: 'change' }],
-  price: [
-    { required: true, message: '请输入价格', trigger: 'blur' },
-    {
-      validator: (rule, value, callback) => {
-        const num = Number(value)
-        if (!value && value !== 0) return callback(new Error('请输入价格'))
-        if (!Number.isFinite(num) || num <= 0) return callback(new Error('价格需为正数'))
-        return callback()
-      },
-      trigger: 'blur',
-    },
-  ],
-  desc: [{ required: true, message: '请填写描述', trigger: 'blur' }],
-  image: [{ required: true, message: '请上传图片', trigger: 'change' }],
-  location: [{ required: true, message: '请填写地区', trigger: 'blur' }],
+  oldDegree: [{ required: true, message: '请选择成色', trigger: 'change' }],
+  description: [{ required: true, message: '请填写描述', trigger: 'blur' }],
+  coverImages: [{ required: true, message: '请上传图片', trigger: 'change' }],
+  address: [{ required: true, message: '请填写地区', trigger: 'blur' }],
 }
 
 watch(
@@ -126,8 +144,10 @@ watch(
   (val) => {
     if (!val) {
       formRef.value?.resetFields?.()
-      form.value.image = ''
+      form.value.coverImages = ''
+      form.value.pickUpType = 1
       fileList.value = []
+      imageFile.value = null
     }
   },
 )
@@ -142,9 +162,10 @@ async function submit() {
     submitting.value = true
     await formEl.validate()
 
-    ElMessage.success('发布成功（待接入后端）')
-    emit('submitted', { ...form.value })
-    visible.value = false
+    emit('submitted', {
+      ...form.value,
+      imageFile: imageFile.value,
+    })
   } catch (error) {
   } finally {
     submitting.value = false
@@ -166,16 +187,18 @@ async function handleFileChange(uploadFile, uploadFiles) {
 
   try {
     fileList.value = uploadFiles.slice(-1)
-    form.value.image = await fileToDataUrl(raw)
-    formRef.value?.validateField?.('image')
+    imageFile.value = raw
+    form.value.coverImages = await fileToDataUrl(raw)
+    formRef.value?.validateField?.('coverImages')
   } catch (error) {
     ElMessage.error('图片处理失败')
   }
 }
 
 function handleFileRemove() {
-  form.value.image = ''
+  form.value.coverImages = ''
   fileList.value = []
+  imageFile.value = null
 }
 
 function handleExceed() {

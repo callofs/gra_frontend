@@ -10,7 +10,7 @@
 
     <div class="grid">
       <article v-for="item in experts" :key="item.name" class="card">
-        <div class="cover" :style="{ backgroundImage: item.cover }"></div>
+        <div class="cover" :style="{ backgroundImage: item.avatar ? `url(${item.avatar})` : item.cover }"></div>
         <div class="body">
           <div class="row">
             <div class="name">{{ item.name }}</div>

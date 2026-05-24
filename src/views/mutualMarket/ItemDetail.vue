@@ -11,32 +11,56 @@
       <div class="main-container">
         <el-button class="back" text @click="goBack">返回</el-button>
 
-        <div v-if="item" class="panel">
+        <div v-loading="loading" class="detail-content">
+          <div v-if="item" class="panel">
           <div class="media">
             <img class="image" :src="item.image" alt="image" />
           </div>
 
           <div class="info">
             <div class="title-row">
-              <div class="name">{{ item.name }}</div>
+              <div class="name">{{ item.title || item.name }}</div>
               <div class="condition">{{ item.condition }}</div>
             </div>
 
             <div class="desc">{{ item.desc }}</div>
 
             <div class="price-row">
-              <div class="price">¥{{ item.price }}</div>
-              <div v-if="item.originPrice" class="origin">¥{{ item.originPrice }}</div>
+              <div class="price">{{ item.goodsTypeName || '闲置物品' }}</div>
             </div>
 
             <div class="meta">
               <div class="meta-item">
                 <span class="meta-label">分类</span>
-                <span class="meta-value">{{ categoryName }}</span>
+                <span class="meta-value">{{ item.goodsTypeName || item.category }}</span>
               </div>
               <div class="meta-item">
                 <span class="meta-label">地区</span>
                 <span class="meta-value">{{ item.location }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">适龄范围</span>
+                <span class="meta-value">{{ item.fitAge }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">尺码规格</span>
+                <span class="meta-value">{{ item.size }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">适用季节</span>
+                <span class="meta-value">{{ item.season }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">材质</span>
+                <span class="meta-value">{{ item.material }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">取件方式</span>
+                <span class="meta-value">{{ item.pickUpTypeLabel }}</span>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">发布时间</span>
+                <span class="meta-value">{{ item.createTime }}</span>
               </div>
             </div>
 
@@ -54,46 +78,111 @@
               </div>
             </div>
           </div>
-        </div>
+          </div>
 
-        <el-empty v-else description="未找到该物品" />
+          <el-empty v-else-if="!loading" description="未找到该物品" />
+        </div>
       </div>
     </section>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { mockItems } from './mockItems'
+import { createPrivateMessageSocket, getPrivateMessageSocket } from '@/api/chat'
+import { getGoodsDetail } from '@/api/goods.js'
+import { useAppStore } from '@/store/app'
 
 const route = useRoute()
 const router = useRouter()
+const appStore = useAppStore()
 
-const categoriesMap = {
-  all: '全部物品',
-  baby: '母婴用品',
-  clothes: '童装童鞋',
-  toy: '玩具游乐',
-  book: '图书文具',
-  furniture: '儿童家具',
-  travel: '安全出行',
-  feed: '喂养用品',
-  other: '其他',
+const item = ref(null)
+const loading = ref(false)
+
+function normalizeImage(value) {
+  if (Array.isArray(value)) {
+    return normalizeImage(value[0])
+  }
+
+  if (typeof value !== 'string') return ''
+
+  const normalized = value.trim()
+  if (!normalized) return ''
+
+  if (normalized.startsWith('data:')) return normalized
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) return normalized
+
+  return `data:image/jpeg;base64,${normalized}`
 }
 
-const itemId = computed(() => Number(route.params.id))
+function getPickUpTypeLabel(value) {
+  if (value === 1) return '自提'
+  if (value === 2) return '邮寄'
+  if (value === 3) return '均可'
+  return '未知'
+}
 
-const item = computed(() => {
-  if (!Number.isFinite(itemId.value)) return null
-  return mockItems.find((i) => i.id === itemId.value) || null
-})
+function formatDateTime(value) {
+  if (!value) return '未知'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleString('zh-CN', { hour12: false })
+}
 
-const categoryName = computed(() => {
-  if (!item.value) return ''
-  return categoriesMap[item.value.category] || item.value.category
-})
+function normalizeGoodsDetail(data) {
+  return {
+    id: data?.id,
+    userId: data?.userId,
+    category: data?.goodsTypeCode || '',
+    goodsTypeName: data?.goodsTypeName || '闲置物品',
+    title: data?.title || '',
+    name: data?.name || '未命名物品',
+    desc: data?.description || '暂无描述',
+    fitAge: data?.fitAge || '未填写',
+    size: data?.size || '未填写',
+    season: data?.season || '未填写',
+    material: data?.material || '未填写',
+    condition: data?.oldDegree || '成色未知',
+    pickUpType: Number(data?.pickUpType || 0),
+    pickUpTypeLabel: getPickUpTypeLabel(Number(data?.pickUpType || 0)),
+    location: data?.address || '未知地区',
+    image: data?.coverImages || 'https://picsum.photos/seed/market-default/600/400',
+    sellerName: data?.publisherNickname || '匿名用户',
+    sellerAvatar: normalizeImage(data?.publisherAvatar) || 'https://picsum.photos/seed/avatar-default/80/80',
+    createTime: formatDateTime(data?.createTime),
+  }
+}
+
+async function fetchDetail() {
+  const itemId = Number(route.params.id)
+  if (!Number.isFinite(itemId) || itemId <= 0) {
+    item.value = null
+    return
+  }
+
+  loading.value = true
+  try {
+    const res = await getGoodsDetail(itemId)
+    item.value = normalizeGoodsDetail(res)
+  } catch (error) {
+    item.value = null
+    ElMessage.error(error?.message || '获取物品详情失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+function ensurePrivateMessageConnection() {
+  const socket = getPrivateMessageSocket()
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    return socket
+  }
+
+  return createPrivateMessageSocket()
+}
 
 function goBack() {
   if (window.history.length > 1) {
@@ -106,8 +195,36 @@ function goBack() {
 
 function contactSeller() {
   if (!item.value) return
-  ElMessage.info(`联系卖家：${item.value.sellerName}（待接入后端）`)
+
+  const currentUserId = String(appStore.userInfo?.id || '').trim()
+  const sellerUserId = String(item.value.userId || '').trim()
+
+  if (!sellerUserId) {
+    ElMessage.warning('卖家信息不完整')
+    return
+  }
+
+  if (currentUserId && sellerUserId === currentUserId) {
+    ElMessage.warning('不能与自己聊天')
+    return
+  }
+
+  try {
+    ensurePrivateMessageConnection()
+  } catch (error) {
+  }
+
+  router.push({
+    name: 'chat',
+    query: {
+      targetUserId: sellerUserId,
+      targetName: item.value.sellerName || '',
+      targetAvatar: item.value.sellerAvatar || '',
+    },
+  })
 }
+
+onMounted(fetchDetail)
 </script>
 
 <style scoped>
@@ -143,6 +260,10 @@ function contactSeller() {
 .main-container {
   width: 1200px;
   margin: 0 auto;
+}
+
+.detail-content {
+  min-height: 420px;
 }
 
 .back {

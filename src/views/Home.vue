@@ -55,47 +55,52 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ExpertTeamCard from '../components/ExpertTeamCard.vue'
 import NewsSection from '@/components/NewsSection.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import { getExpertsList } from '@/api/user'
 
 const router = useRouter()
 
-const experts = [
-  {
-    name: '张医生',
-    score: '4.9',
-    title: '北京儿童医院 儿科主任医师',
-    desc: '擅长儿童常见疾病诊疗、生长发育评估、营养指导。',
-    cover:
-      'linear-gradient(135deg, rgba(59,130,246,.28), rgba(34,211,238,.24)), radial-gradient(220px 120px at 70% 30%, rgba(255,255,255,.38), transparent 60%)',
-  },
-  {
-    name: '李教授',
-    score: '4.8',
-    title: '知名教育专家 亲子教育顾问',
-    desc: '擅长家庭教育指导、学习习惯培养、早期教育规划。',
-    cover:
-      'linear-gradient(135deg, rgba(16,185,129,.24), rgba(59,130,246,.2)), radial-gradient(200px 120px at 75% 35%, rgba(255,255,255,.38), transparent 60%)',
-  },
-  {
-    name: '王老师',
-    score: '4.9',
-    title: '儿童心理咨询师 家庭关系指导',
-    desc: '擅长亲子沟通、情绪引导、行为习惯干预与修复。',
-    cover:
-      'linear-gradient(135deg, rgba(244,114,182,.2), rgba(168,85,247,.24)), radial-gradient(220px 120px at 72% 32%, rgba(255,255,255,.38), transparent 60%)',
-  },
-  {
-    name: '刘营养师',
-    score: '4.7',
-    title: '注册营养师 儿童营养顾问',
-    desc: '专注儿童营养搭配、辅食添加指导、饮食健康管理。',
-    cover:
-      'linear-gradient(135deg, rgba(245,158,11,.24), rgba(251,191,36,.2)), radial-gradient(220px 120px at 72% 32%, rgba(255,255,255,.36), transparent 60%)',
-  },
+const experts = ref([])
+
+const coverGradients = [
+  'linear-gradient(135deg, rgba(59,130,246,.28), rgba(34,211,238,.24)), radial-gradient(220px 120px at 70% 30%, rgba(255,255,255,.38), transparent 60%)',
+  'linear-gradient(135deg, rgba(16,185,129,.24), rgba(59,130,246,.2)), radial-gradient(200px 120px at 75% 35%, rgba(255,255,255,.38), transparent 60%)',
+  'linear-gradient(135deg, rgba(244,114,182,.2), rgba(168,85,247,.24)), radial-gradient(220px 120px at 72% 32%, rgba(255,255,255,.38), transparent 60%)',
+  'linear-gradient(135deg, rgba(245,158,11,.24), rgba(251,191,36,.2)), radial-gradient(220px 120px at 72% 32%, rgba(255,255,255,.36), transparent 60%)',
 ]
+
+onMounted(async () => {
+  try {
+    const res = await getExpertsList(4)
+    if (res && res.length > 0) {
+      experts.value = res.map((item, index) => {
+        let avatarUrl = ''
+        if (item.avatar && item.avatar.length > 0) {
+          const avatarData = item.avatar
+          if (avatarData && !avatarData.startsWith('data:')) {
+            avatarUrl = `data:image/jpeg;base64,${avatarData}`
+          } else {
+            avatarUrl = avatarData || ''
+          }
+        }
+        return {
+          name: item.nickname || item.username,
+          score: item.creditScore ? item.creditScore.toString() : '4.8',
+          title: item.certificationMaterials || '资深专家',
+          desc: `粉丝数: ${item.followerCount || 0} | 关注数: ${item.followCount || 0}`,
+          cover: coverGradients[index % coverGradients.length],
+          avatar: avatarUrl,
+        }
+      })
+    }
+  } catch (error) {
+    console.error('获取专家列表失败:', error)
+  }
+})
 
 function goHome() {
   router.push('/home')

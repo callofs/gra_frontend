@@ -1,6 +1,6 @@
 <template>
   <div class="market-page">
-    <PublishDialog v-model="publishVisible" @submitted="handlePublishSubmitted" />
+    <PublishDialog v-model="publishVisible" :categories="categories" @submitted="handlePublishSubmitted" />
 
     <section class="market-hero">
       <div class="hero-container">
@@ -102,19 +102,21 @@
             </el-select>
           </div>
 
-          <div class="grid">
-            <article v-for="item in pagedItems" :key="item.id" class="item-card" @click="openItem(item)">
+          <div v-loading="loading" class="grid-wrap">
+            <div v-if="!loading && pagedItems.length === 0" class="empty-state">暂无闲置物品</div>
+
+            <div v-else class="grid">
+              <article v-for="item in pagedItems" :key="item.id" class="item-card" @click="openItem(item)">
               <div class="item-image">
                 <img :src="item.image" alt="image" />
               </div>
 
               <div class="item-body">
-                <div class="item-name">{{ item.name }}</div>
+                <div class="item-name">{{ item.title || item.name }}</div>
                 <div class="item-desc">{{ item.desc }}</div>
 
                 <div class="price-row">
-                  <div class="price">¥{{ item.price }}</div>
-                  <div class="origin" v-if="item.originPrice">¥{{ item.originPrice }}</div>
+                  <div class="price">{{ item.goodsTypeName || '闲置物品' }}</div>
                   <div class="condition">{{ item.condition }}</div>
                 </div>
 
@@ -126,7 +128,8 @@
                   <div class="location">{{ item.location }}</div>
                 </div>
               </div>
-            </article>
+              </article>
+            </div>
           </div>
 
           <div class="pagination">
@@ -134,9 +137,9 @@
               background
               layout="prev, pager, next"
               :page-size="pageSize"
-              :total="filteredItems.length"
+              :total="total"
               :current-page="page"
-              @current-change="(p) => (page = p)"
+              @current-change="handlePageChange"
             />
           </div>
         </main>
@@ -146,25 +149,16 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
-import { mockItems } from './mockItems'
+import { getDictList } from '@/api/dict.js'
+import { getGoodsList, publishGoods, uploadGoodsImage } from '@/api/goods.js'
 import PublishDialog from './components/PublishDialog.vue'
 
 const router = useRouter()
 
-const categories = [
-  { key: 'all', name: '全部物品', count: '3.5w' },
-  { key: 'baby', name: '母婴用品', count: '8.2k' },
-  { key: 'clothes', name: '童装童鞋', count: '7.6k' },
-  { key: 'toy', name: '玩具游乐', count: '6.9k' },
-  { key: 'book', name: '图书文具', count: '5.4k' },
-  { key: 'furniture', name: '儿童家具', count: '3.1k' },
-  { key: 'travel', name: '安全出行', count: '2.8k' },
-  { key: 'feed', name: '喂养用品', count: '1.6k' },
-  { key: 'other', name: '其他', count: '920' },
-]
+const categories = ref([{ key: 'all', name: '全部物品', count: '' }])
 
 const activeCategory = ref('all')
 
@@ -179,55 +173,115 @@ const priceMax = ref('')
 
 const page = ref(1)
 const pageSize = 8
+const total = ref(0)
+const loading = ref(false)
 
 const publishVisible = ref(false)
 
-const items = ref(mockItems)
+const items = ref([])
 
-const filteredItems = computed(() => {
-  const kw = String(keyword.value || '').trim().toLowerCase()
-  const min = Number(priceMin.value)
-  const max = Number(priceMax.value)
+function normalizeDictList(res) {
+  return Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []
+}
 
-  return items.value
-    .filter((i) => (activeCategory.value === 'all' ? true : i.category === activeCategory.value))
-    .filter((i) => {
-      if (!kw) return true
-      return `${i.name} ${i.desc}`.toLowerCase().includes(kw)
-    })
-    .filter((i) => {
-      if (activeCondition.value === '全部') return true
-      return i.condition === activeCondition.value
-    })
-    .filter((i) => {
-      if (priceMin.value && Number.isFinite(min) && i.price < min) return false
-      if (priceMax.value && Number.isFinite(max) && i.price > max) return false
-      return true
-    })
-})
+function buildCategories(dictItems = []) {
+  const dynamicCategories = [...dictItems]
+    .sort((a, b) => Number(a?.sort || 0) - Number(b?.sort || 0))
+    .map((item) => ({
+      key: item?.dictCode || String(item?.id || ''),
+      name: item?.dictName || item?.dictCode || '未命名分类',
+      count: '',
+    }))
+    .filter((item) => item.key)
+
+  return [{ key: 'all', name: '全部物品', count: '' }, ...dynamicCategories]
+}
+
+async function fetchCategories() {
+  try {
+    const res = await getDictList('idleGoods')
+    categories.value = buildCategories(normalizeDictList(res))
+  } catch (error) {
+    categories.value = [{ key: 'all', name: '全部物品', count: '' }]
+    ElMessage.error(error?.message || '获取物品分类失败')
+  }
+}
 
 const sortedItems = computed(() => {
-  const list = [...filteredItems.value]
-
-  if (sortKey.value === 'price_asc') {
-    return list.sort((a, b) => a.price - b.price)
-  }
-
-  if (sortKey.value === 'price_desc') {
-    return list.sort((a, b) => b.price - a.price)
-  }
-
-  return list.sort((a, b) => b.id - a.id)
+  const list = [...items.value]
+  return list.sort((a, b) => new Date(b.createTime || 0).getTime() - new Date(a.createTime || 0).getTime())
 })
 
-const pagedItems = computed(() => {
-  const start = (page.value - 1) * pageSize
-  return sortedItems.value.slice(start, start + pageSize)
-})
+const pagedItems = computed(() => sortedItems.value)
+
+function normalizeGoodsListResponse(res) {
+  const data = res?.data ?? res ?? {}
+  const records = Array.isArray(data?.records) ? data.records : Array.isArray(res?.records) ? res.records : []
+  return {
+    records,
+    total: Number(data?.total ?? res?.total ?? records.length ?? 0),
+  }
+}
+
+function normalizeImage(value) {
+  if (Array.isArray(value)) {
+    return normalizeImage(value[0])
+  }
+
+  if (typeof value !== 'string') return ''
+
+  const normalized = value.trim()
+  if (!normalized) return ''
+
+  if (normalized.startsWith('data:')) return normalized
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) return normalized
+
+  return `data:image/jpeg;base64,${normalized}`
+}
+
+function normalizeGoodsItem(item) {
+  return {
+    id: item?.id,
+    category: item?.goodsTypeCode || '',
+    goodsTypeName: item?.goodsTypeName || '',
+    title: item?.title || '',
+    name: item?.name || '未命名物品',
+    desc: item?.description || '',
+    condition: item?.oldDegree || '成色未知',
+    image: item?.coverImages || 'https://picsum.photos/seed/market-default/600/400',
+    sellerName: item?.publisherNickname || '匿名用户',
+    sellerAvatar: normalizeImage(item?.publisherAvatar) || 'https://picsum.photos/seed/avatar-default/80/80',
+    location: item?.address || '未知地区',
+    viewCount: Number(item?.viewCount || 0),
+    createTime: item?.createTime || '',
+  }
+}
+
+async function fetchGoods() {
+  loading.value = true
+  try {
+    const res = await getGoodsList({
+      page: page.value,
+      size: pageSize,
+      goodsTypeCode: activeCategory.value === 'all' ? '' : activeCategory.value,
+      keyword: keyword.value,
+    })
+    const { records, total: nextTotal } = normalizeGoodsListResponse(res)
+    items.value = records.map(normalizeGoodsItem)
+    total.value = nextTotal
+  } catch (error) {
+    items.value = []
+    total.value = 0
+    ElMessage.error(error?.message || '获取闲置物品列表失败')
+  } finally {
+    loading.value = false
+  }
+}
 
 function selectCategory(key) {
   activeCategory.value = key
   page.value = 1
+  fetchGoods()
 }
 
 function resetFilters() {
@@ -236,11 +290,19 @@ function resetFilters() {
   priceMax.value = ''
   activeCondition.value = '全部'
   sortKey.value = 'latest'
+  activeCategory.value = 'all'
   page.value = 1
+  fetchGoods()
 }
 
 function applyFilters() {
   page.value = 1
+  fetchGoods()
+}
+
+function handlePageChange(p) {
+  page.value = p
+  fetchGoods()
 }
 
 function openItem(item) {
@@ -251,13 +313,53 @@ function openItem(item) {
   router.push(`/market/${item.id}`)
 }
 
+function resolveImageKey(uploadRes) {
+  if (typeof uploadRes === 'string') return uploadRes
+
+  return uploadRes.data.url
+}
+
 function handlePublish() {
   publishVisible.value = true
 }
 
-function handlePublishSubmitted(payload) {
-  ElMessage.success('已提交发布信息（待接入后端）')
+async function handlePublishSubmitted(payload) {
+  try {
+    const uploadRes = await uploadGoodsImage(payload?.imageFile)
+    const imageKey = resolveImageKey(uploadRes)
+
+    if (!imageKey) {
+      throw new Error('图片上传结果无效')
+    }
+
+    await publishGoods({
+      goodsTypeCode: payload.goodsTypeCode,
+      title: payload.title,
+      name: payload.name,
+      coverImages: imageKey,
+      description: payload.description,
+      fitAge: payload.fitAge,
+      size: payload.size,
+      season: payload.season,
+      material: payload.material,
+      oldDegree: payload.oldDegree,
+      pickUpType: Number(payload.pickUpType || 0),
+      address: payload.address,
+    })
+
+    ElMessage.success('发布成功')
+    publishVisible.value = false
+    page.value = 1
+    await fetchGoods()
+  } catch (error) {
+    ElMessage.error(error?.message || '发布闲置物品失败')
+  }
 }
+
+onMounted(async () => {
+  await fetchCategories()
+  await fetchGoods()
+})
 </script>
 
 <style scoped>
@@ -340,6 +442,10 @@ function handlePublishSubmitted(payload) {
 .content {
   flex: 1;
   min-width: 0;
+}
+
+.grid-wrap {
+  min-height: 320px;
 }
 
 .card {
@@ -475,6 +581,15 @@ function handlePublishSubmitted(payload) {
   width: 150px;
 }
 
+.empty-state {
+  margin-top: 16px;
+  padding: 48px 16px;
+  border: 1px dashed rgba(226, 232, 240, 1);
+  border-radius: 12px;
+  text-align: center;
+  color: rgba(100, 116, 139, 1);
+}
+
 .grid {
   margin-top: 16px;
   display: grid;
@@ -532,7 +647,7 @@ function handlePublishSubmitted(payload) {
 .price {
   color: rgba(22, 163, 74, 1);
   font-weight: 800;
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .origin {

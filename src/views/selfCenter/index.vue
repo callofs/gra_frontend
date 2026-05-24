@@ -51,6 +51,7 @@ import HelpPanel from './components/HelpPanel.vue'
 import FeedbackPanel from './components/FeedbackPanel.vue'
 import MessagePanel from './components/MessagePanel.vue'
 import MyPostsPanel from './components/MyPostsPanel.vue'
+import MyGoodsPanel from './components/MyGoodsPanel.vue'
 import ProfileContentPanel from './components/ProfileContentPanel.vue'
 import MyFollowersPanel from './components/MyFollowersPanel.vue'
 import MyFollowsPanel from './components/MyFollowsPanel.vue'
@@ -75,6 +76,7 @@ const navGroups = [
     items: [
       { key: 'utilityTools', label: '实用工具', icon: '🧰' },
       { key: 'myPosts', label: '我的贴文', icon: '📝' },
+      { key: 'myGoods', label: '我的闲置物品', icon: '🛍' },
       { key: 'favorite', label: '我的收藏', icon: '⭐' },
       { key: 'myFollows', label: '我的关注', icon: '👀' },
       { key: 'myFollowers', label: '我的粉丝', icon: '🫶'},
@@ -118,6 +120,7 @@ const navComponentMap = {
   message: MessagePanel,
   utilityTools: UtilityToolsPanel,
   myPosts: MyPostsPanel,
+  myGoods: MyGoodsPanel,
   favorite: FavoritePanel,
   history: HistoryPanel,
   download: DownloadPanel,
