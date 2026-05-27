@@ -314,30 +314,29 @@ async function onRegister() {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: radial-gradient(1200px 600px at 20% 10%, rgba(59, 130, 246, 0.25), transparent 60%),
-    radial-gradient(900px 500px at 80% 30%, rgba(34, 197, 94, 0.22), transparent 60%),
-    #0b1220;
+  background: #ffffff;
 }
 
 .card {
   width: min(420px, 100%);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
   padding: 18px;
-  backdrop-filter: blur(10px);
-  color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+  color: #111111;
 }
 
 .title {
   font-size: 22px;
   font-weight: 750;
+  color: #111111;
 }
 
 .sub {
   margin-top: 6px;
   font-size: 13px;
-  opacity: 0.85;
+  color: #374151;
 }
 
 .form {
@@ -354,31 +353,44 @@ async function onRegister() {
 .error {
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(239, 68, 68, 0.18);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: rgba(255, 255, 255, 0.95);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
   font-size: 13px;
 }
 
 .hint {
   margin-top: 12px;
   font-size: 12px;
-  opacity: 0.82;
+  color: #4b5563;
   line-height: 1.5;
   text-align: right;
 }
 
 .hint-action {
   cursor: pointer;
-  color: #93c5fd;
+  color: #2563eb;
 }
 
 :deep(.el-form-item__label) {
-  color: rgba(255, 255, 255, 0.92);
+  color: #111111;
 }
 
 :deep(.el-input__wrapper) {
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px #d1d5db inset;
+ }
+
+ :deep(.el-input__inner) {
+  color: #111111;
+ }
+
+ :deep(.el-radio) {
+  color: #111111;
+ }
+
+ :deep(.el-upload__tip) {
+  color: #6b7280;
 }
 </style>

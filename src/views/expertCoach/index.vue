@@ -153,7 +153,7 @@ import BookDialog from './components/BookDialog.vue'
 import LectureBookDialog from './components/LectureBookDialog.vue'
 import PublishLectureDialog from './components/PublishLectureDialog.vue'
 import { getLectureList, signupLecture, cancelSignup, createLecture, uploadLectureImage } from '@/api/lecture'
-import { getExpertsList } from '@/api/user'
+import { getExpertsList, getUserById } from '@/api/user'
 import { getExpertSchedules, createConsultReservation } from '@/api/consultReservation'
 import { useAppStore } from '@/store/app'
 
@@ -264,13 +264,44 @@ function normalizeImageSource(value) {
   return ''
 }
 
+async function loadLectureExpertMap(records) {
+  const expertIds = [...new Set(records
+    .map((item) => item?.expertId)
+    .filter((id) => id !== undefined && id !== null && id !== ''))]
+
+  if (!expertIds.length) {
+    return new Map()
+  }
+
+  const expertEntries = await Promise.all(expertIds.map(async (expertId) => {
+    try {
+      const result = await getUserById(expertId)
+      const user = result?.data || result?.userInfo || result || {}
+      return [String(expertId), {
+        nickname: user?.nickname || user?.username || '专家',
+        avatar: normalizeImageSource(user?.avatar),
+      }]
+    } catch (error) {
+      return [String(expertId), {
+        nickname: '专家',
+        avatar: '',
+      }]
+    }
+  }))
+
+  return new Map(expertEntries)
+}
+
 async function loadLectures() {
   try {
     const res = await getLectureList(1, 10)
     if (res && res.records) {
+      const expertMap = await loadLectureExpertMap(res.records)
+
       lectures.value = res.records.map((item) => {
         const coverUrl = normalizeImageSource(item.cover)
-        const expertAvatarUrl = normalizeImageSource(item.expertAvatar)
+        const lectureExpert = expertMap.get(String(item?.expertId)) || {}
+        const expertAvatarUrl = lectureExpert.avatar || normalizeImageSource(item.expertAvatar)
 
         const lectureTime = new Date(item.lectureTime)
         const now = new Date()
@@ -286,7 +317,7 @@ async function loadLectures() {
         return {
           id: item.id,
           title: item.title,
-          expert: item.expertName || '专家',
+          expert: lectureExpert.nickname || item.expertName || '专家',
           expertAvatar: expertAvatarUrl || 'https://picsum.photos/seed/lex1/100/100',
           time: formatLectureTime(item.lectureTime),
           ended: ended,

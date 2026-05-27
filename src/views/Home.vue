@@ -11,7 +11,7 @@
           </div>
         </div>
         <div class="hero-img">
-          <img class="hero-img-inner" src="@/assets/hero-parenting.svg" alt="育儿成长插画" />
+          <HomeHeroCarousel />
         </div>
       </div>
     </section>
@@ -58,6 +58,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ExpertTeamCard from '../components/ExpertTeamCard.vue'
+import HomeHeroCarousel from '@/components/HomeHeroCarousel.vue'
 import NewsSection from '@/components/NewsSection.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { getExpertsList } from '@/api/user'
@@ -189,19 +190,7 @@ function goProfile() {
 
 .hero-img {
   width: 100%;
-  height: 280px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(34, 211, 238, 0.12));
-  border: 1px solid rgba(226, 232, 240, 1);
-  overflow: hidden;
-  position: relative;
-}
-
-.hero-img-inner {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+  min-height: 280px;
 }
 
 .section {

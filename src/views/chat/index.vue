@@ -611,6 +611,7 @@ watch(
 
 .message-list {
   padding: 24px;
+  max-height: 520px;
   overflow: auto;
   display: flex;
   flex-direction: column;

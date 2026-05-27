@@ -242,7 +242,7 @@ function normalizeImage(value) {
 
 function resolveImageKey(uploadRes) {
   if (typeof uploadRes === 'string') return uploadRes
-  return uploadRes?.url || uploadRes?.objectKey || uploadRes?.key || uploadRes?.imageUrl || ''
+  return uploadRes?.data?.url || ''
 }
 
 function getPickUpTypeLabel(value) {

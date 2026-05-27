@@ -35,6 +35,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getAvatar, getCurrentUserCertificationMaterial, logoutRequest, uploadAvatar } from '@/api/user'
 import { useAppStore } from '@/store/app'
@@ -53,10 +54,13 @@ import MessagePanel from './components/MessagePanel.vue'
 import MyPostsPanel from './components/MyPostsPanel.vue'
 import MyGoodsPanel from './components/MyGoodsPanel.vue'
 import ExpertSchedulePanel from './components/ExpertSchedulePanel.vue'
+import MyLectureSignupsPanel from './components/MyLectureSignupsPanel.vue'
+import MyLecturesPanel from './components/MyLecturesPanel.vue'
 import ProfileContentPanel from './components/ProfileContentPanel.vue'
 import MyFollowersPanel from './components/MyFollowersPanel.vue'
 import MyFollowsPanel from './components/MyFollowsPanel.vue'
 
+const router = useRouter()
 const appStore = useAppStore()
 const activeNav = ref('profile')
 const editDialogVisible = ref(false)
@@ -77,6 +81,10 @@ const navGroups = [
     items: [
       { key: 'utilityTools', label: '实用工具', icon: '🧰' },
       { key: 'myPosts', label: '我的贴文', icon: '📝' },
+      { key: 'myLectureSignups', label: '我的讲座预约', icon: '🎫' },
+      ...(appStore.role === '专家'
+        ? [{ key: 'myLectures', label: '我的讲座', icon: '🎤' }]
+        : []),
       ...(appStore.role === '专家'
         ? [{ key: 'expertSchedule', label: '排班管理', icon: '🗓' }]
         : []),
@@ -87,7 +95,7 @@ const navGroups = [
       { key: 'history', label: '浏览历史', icon: '🕘' },
       { key: 'download', label: '我的下载', icon: '⬇' },
       ...(appStore.role === '管理员'
-        ? [{ key: 'dictAdmin', label: '模块管理', icon: '🧩' }]
+        ? [{ key: 'dictAdmin', label: '系统管理', icon: '⚙' }]
         : []),
     ],
   },
@@ -124,6 +132,8 @@ const navComponentMap = {
   message: MessagePanel,
   utilityTools: UtilityToolsPanel,
   myPosts: MyPostsPanel,
+  myLectureSignups: MyLectureSignupsPanel,
+  myLectures: MyLecturesPanel,
   expertSchedule: ExpertSchedulePanel,
   myGoods: MyGoodsPanel,
   favorite: FavoritePanel,
@@ -424,6 +434,11 @@ async function handleNavClick(key) {
       appStore.logout()
       ElMessage.success('已退出登录')
     }
+    return
+  }
+
+  if (key === 'dictAdmin') {
+    router.push('/admin')
     return
   }
 
