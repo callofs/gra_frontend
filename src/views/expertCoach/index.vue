@@ -72,7 +72,7 @@
 
           <div class="expert-grid">
             <article v-for="e in filteredExperts" :key="e.id" class="expert-card" @click="openExpert(e)">
-              <div class="expert-cover">
+              <div class="expert-cover" @click.stop="viewExpertProfile(e)">
                 <div class="badge">实名认证</div>
                 <img :src="e.cover" alt="cover" />
               </div>
@@ -149,6 +149,7 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import BookDialog from './components/BookDialog.vue'
 import LectureBookDialog from './components/LectureBookDialog.vue'
 import PublishLectureDialog from './components/PublishLectureDialog.vue'
@@ -189,6 +190,7 @@ const currentLecture = ref(null)
 const publishDialogVisible = ref(false)
 
 const appStore = useAppStore()
+const router = useRouter()
 
 const isExpert = computed(() => {
   return appStore.role === '专家'
@@ -508,6 +510,16 @@ function handleViewAll() {
 
 function openExpert(expert) {
   openBookDialog(expert)
+}
+
+function viewExpertProfile(expert) {
+  const expertId = expert?.id || expert?.raw?.id
+  if (!expertId) {
+    ElMessage.warning('无法获取专家信息')
+    return
+  }
+
+  router.push({ name: 'user-detail', params: { userId: expertId } })
 }
 
 function openLecture(lecture) {

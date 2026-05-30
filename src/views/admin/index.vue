@@ -46,6 +46,7 @@
           :items="certifications"
           :status-label-map="statusLabelMap"
           :status-type-map="statusTypeMap"
+          v-loading="certificationLoading"
           @preview="handlePreview"
           @approve="handleApprove"
           @reject="handleReject"
@@ -89,6 +90,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { auditForum, getAllForumList } from '@/api/forum'
+import { changeUserRole, getExpertCertificationMaterial, getExpertCertificationMaterialList } from '@/api/admin'
 import { useAppStore } from '@/store/app'
 import CertificationReviewPanel from './components/CertificationReviewPanel.vue'
 import PostReviewPanel from './components/PostReviewPanel.vue'
@@ -99,6 +101,7 @@ const appStore = useAppStore()
 const router = useRouter()
 const activeModule = ref('certification')
 const postReviewLoading = ref(false)
+const certificationLoading = ref(false)
 
 const statusLabelMap = {
   pending: '待审核',
@@ -112,11 +115,9 @@ const statusTypeMap = {
   rejected: 'danger',
 }
 
-const certifications = ref([
-  { id: 1, name: '李教授', field: '心理咨询', submitTime: '2026-05-10 14:20', fileName: '心理咨询资质.pdf', status: 'pending' },
-  { id: 2, name: '张医生', field: '儿科', submitTime: '2026-05-09 10:05', fileName: '执业医师证.pdf', status: 'approved' },
-  { id: 3, name: '王老师', field: '家庭教育', submitTime: '2026-05-08 18:42', fileName: '教师资格证.pdf', status: 'rejected' },
-])
+const CERTIFICATION_TYPE = 'certification'
+
+const certifications = ref([])
 
 const postReviews = ref([])
 
@@ -192,6 +193,60 @@ function normalizeForumListResponse(res) {
   return Array.isArray(res) ? res : Array.isArray(res?.records) ? res.records : Array.isArray(res?.data) ? res.data : []
 }
 
+function normalizeCertificationListResponse(res) {
+  const source = res?.data ?? res
+  if (Array.isArray(source?.records)) return source.records
+  if (Array.isArray(source?.list)) return source.list
+  if (Array.isArray(source)) return source
+  return []
+}
+
+function formatDateTime(value) {
+  if (!value) return '--'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  const hh = String(date.getHours()).padStart(2, '0')
+  const mi = String(date.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`
+}
+
+function isCertificationItem(payload) {
+  return payload && typeof payload === 'object' && payload.type === CERTIFICATION_TYPE
+}
+
+function mapCertificationItem(item) {
+  const status = normalizeAuditStatus(item?.status ?? item?.auditStatus ?? item?.reviewStatus ?? item?.state)
+
+  return {
+    type: CERTIFICATION_TYPE,
+    id: item?.id ?? item?.certificationId ?? `${item?.userId ?? 'user'}-${item?.createTime ?? Date.now()}`,
+    userId: item?.userId ?? item?.applicantId ?? item?.id,
+    name: item?.userNickname || item?.nickname || item?.username || item?.name || `用户${item?.userId ?? ''}`,
+    field: item?.field || item?.specialty || item?.domain || item?.profession || '综合领域',
+    submitTime: formatDateTime(item?.submitTime || item?.createTime || item?.updateTime || item?.applyTime),
+    fileName: item?.fileName || item?.certificationName || item?.materialName || '认证材料',
+    status,
+    raw: item,
+  }
+}
+
+async function fetchCertifications() {
+  certificationLoading.value = true
+  try {
+    const res = await getExpertCertificationMaterialList()
+    const list = normalizeCertificationListResponse(res)
+    certifications.value = list.map(mapCertificationItem)
+  } catch (error) {
+    certifications.value = []
+    ElMessage.error(error?.message || '获取认证材料列表失败')
+  } finally {
+    certificationLoading.value = false
+  }
+}
+
 async function fetchPostReviews() {
   postReviewLoading.value = true
   try {
@@ -213,15 +268,85 @@ async function fetchPostReviews() {
   }
 }
 
+function revokeObjectUrl(url) {
+  if (!url) return
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, 60000)
+}
+
+async function previewCertificationMaterial(item) {
+  if (!item?.userId) {
+    ElMessage.error('缺少用户信息，无法预览认证材料')
+    return
+  }
+
+  try {
+    const blob = await getExpertCertificationMaterial(item.userId)
+    if (!blob || typeof blob !== 'object' || typeof blob.size !== 'number' || blob.size <= 0) {
+      ElMessage.warning('未获取到认证材料文件')
+      return
+    }
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank', 'noopener,noreferrer')
+    revokeObjectUrl(url)
+  } catch (error) {
+    ElMessage.error(error?.message || '获取认证材料失败')
+  }
+}
+
+async function assignUserRole(userId, role, successMessage) {
+  if (!userId) {
+    ElMessage.error('缺少用户ID，无法更新角色')
+    return false
+  }
+
+  try {
+    await changeUserRole(userId, role)
+    if (successMessage) {
+      ElMessage.success(successMessage)
+    }
+    return true
+  } catch (error) {
+    ElMessage.error(error?.message || '更新用户角色失败')
+    return false
+  }
+}
+
+function updateCertificationStatus(id, status) {
+  certifications.value = certifications.value.map((item) =>
+    item.id === id
+      ? {
+          ...item,
+          status,
+        }
+      : item
+  )
+}
+
 function handlePreview(type, name) {
+  if (isCertificationItem(type)) {
+    previewCertificationMaterial(type)
+    return
+  }
+
   if (typeof type === 'object' && type?.id) {
     router.push({ name: 'forum-detail', params: { id: type.id } })
     return
   }
+
   ElMessage.info(`预览${type}：${name}`)
 }
 
 async function handleApprove(type, name) {
+  if (isCertificationItem(type)) {
+    const success = await assignUserRole(type.userId, 2, `${type.name} 已授予专家角色`)
+    if (success) {
+      updateCertificationStatus(type.id, 'approved')
+    }
+    return
+  }
+
   if (typeof type === 'object' && type?.id) {
     try {
       await auditForum({ postId: type.id, status: 1 })
@@ -232,10 +357,19 @@ async function handleApprove(type, name) {
     }
     return
   }
+
   ElMessage.success(`${type}审核通过：${name}（待接入后端）`)
 }
 
-function handleReject(type, name) {
+async function handleReject(type, name) {
+  if (isCertificationItem(type)) {
+    const success = await assignUserRole(type.userId, 1, `${type.name} 认证已驳回，恢复普通用户角色`)
+    if (success) {
+      updateCertificationStatus(type.id, 'rejected')
+    }
+    return
+  }
+
   ElMessage.warning(`${type}已驳回：${name}（待接入后端）`)
 }
 
@@ -267,6 +401,7 @@ function handleToggleBoard(item) {
 }
 
 onMounted(() => {
+  fetchCertifications()
   fetchPostReviews()
 })
 </script>

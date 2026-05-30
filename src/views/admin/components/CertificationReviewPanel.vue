@@ -25,9 +25,9 @@
         </div>
         <el-tag :type="statusTypeMap[item.status]">{{ statusLabelMap[item.status] }}</el-tag>
         <div class="row-actions">
-          <el-button size="small" @click="emit('preview', '认证材料', item.name)">预览</el-button>
-          <el-button size="small" type="success" @click="emit('approve', '认证材料', item.name)">通过</el-button>
-          <el-button size="small" type="danger" @click="emit('reject', '认证材料', item.name)">驳回</el-button>
+          <el-button size="small" @click="emit('preview', item)">预览</el-button>
+          <el-button size="small" type="success" @click="emit('approve', item)">通过</el-button>
+          <el-button size="small" type="danger" @click="emit('reject', item)">驳回</el-button>
         </div>
       </div>
     </div>
