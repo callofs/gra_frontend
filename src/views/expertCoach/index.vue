@@ -331,6 +331,7 @@ async function loadLectures() {
           cover: coverUrl || 'https://picsum.photos/seed/lec1/900/600',
           description: item.description,
           location: item.location,
+          streamName: item.streamName || item.streamKey || '',
         }
       })
     }
@@ -523,7 +524,23 @@ function viewExpertProfile(expert) {
 }
 
 function openLecture(lecture) {
-  ElMessage.info(`打开讲座：${lecture.title}`)
+  if (!lecture) return
+
+  if (!lecture.ended && !lecture.signedUp) {
+    ElMessage.warning('请先预约该讲座再进入直播间')
+    currentLecture.value = lecture
+    lectureBookDialogVisible.value = true
+    return
+  }
+
+  router.push({
+    name: 'lecture-live',
+    params: { id: lecture.id },
+    query: {
+      title: lecture.title,
+      stream: lecture.streamName || 'stream01',
+    },
+  })
 }
 </script>
 

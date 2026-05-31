@@ -69,6 +69,12 @@ const routes = [
         meta: { public: true },
       },
       {
+        path: 'lectures/:id/live',
+        name: 'lecture-live',
+        component: () => import('@/views/expertCoach/LectureLiveView.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'courses',
         name: 'courses',
         component: () => import('@/views/courses/index.vue'),
