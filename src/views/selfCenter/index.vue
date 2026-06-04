@@ -56,6 +56,7 @@ import MyGoodsPanel from './components/MyGoodsPanel.vue'
 import ExpertSchedulePanel from './components/ExpertSchedulePanel.vue'
 import MyLectureSignupsPanel from './components/MyLectureSignupsPanel.vue'
 import MyLecturesPanel from './components/MyLecturesPanel.vue'
+import MyCoursesPanel from './components/MyCoursesPanel.vue'
 import ProfileContentPanel from './components/ProfileContentPanel.vue'
 import MyFollowersPanel from './components/MyFollowersPanel.vue'
 import MyFollowsPanel from './components/MyFollowsPanel.vue'
@@ -84,6 +85,9 @@ const navGroups = [
       { key: 'myLectureSignups', label: '我的讲座预约', icon: '🎫' },
       ...(appStore.role === '专家'
         ? [{ key: 'myLectures', label: '我的讲座', icon: '🎤' }]
+        : []),
+      ...(appStore.role === '专家'
+        ? [{ key: 'myCourses', label: '我的课程', icon: '📚' }]
         : []),
       ...(appStore.role === '专家'
         ? [{ key: 'expertSchedule', label: '排班管理', icon: '🗓' }]
@@ -135,6 +139,7 @@ const navComponentMap = {
   myLectureSignups: MyLectureSignupsPanel,
   myLectures: MyLecturesPanel,
   expertSchedule: ExpertSchedulePanel,
+  myCourses: MyCoursesPanel,
   myGoods: MyGoodsPanel,
   favorite: FavoritePanel,
   history: HistoryPanel,

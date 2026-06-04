@@ -1,6 +1,14 @@
 <template>
   <div class="courses-page">
     <EnrollDialog v-model="enrollDialogVisible" :course="currentCourse" @submit="handleEnrollSubmit" />
+    <PublishCourseDialog
+      v-model="createDialogVisible"
+      :submitting="createSubmitting"
+      @submit="handleCreateCourseSubmit"
+    />
+    <el-dialog v-model="detailDialogVisible" title="课程详情" width="960px" :before-close="handleDetailClose">
+      <CourseDetailView :course-id="detailCourseId" />
+    </el-dialog>
     <section class="courses-hero">
       <div class="hero-container">
         <div class="hero-left">
@@ -26,6 +34,13 @@
         <div class="hero-actions">
           <el-button class="btn-primary" type="primary" @click="scrollToCourses">开始学习</el-button>
           <el-button class="btn-secondary" @click="scrollToTopics">专题推荐</el-button>
+          <el-button
+            v-if="isExpert"
+            class="btn-create"
+            type="success"
+            plain
+            @click="openCreateDialog"
+          >创建课程</el-button>
         </div>
       </div>
     </section>
@@ -56,8 +71,16 @@
             <el-button class="view-all" @click="handleViewAll">查看全部</el-button>
           </div>
 
-          <div class="course-grid">
-            <article v-for="c in filteredCourses" :key="c.id" class="course-card" @click="openCourse(c)">
+          <div class="course-grid" v-loading="courseLoading">
+            <div v-if="!courseLoading && filteredCourses.length === 0" class="empty-state">暂无课程</div>
+            <article
+              v-for="c in filteredCourses"
+              :key="c.id"
+              class="course-card"
+              :class="{ highlight: highlightCourseId === String(c.id) }"
+              :data-course-id="`course-${c.id}`"
+              @click="openCourse(c)"
+            >
               <div class="course-cover">
                 <div v-if="c.badge" class="course-badge">{{ c.badge }}</div>
                 <img :src="c.cover" alt="cover" />
@@ -113,9 +136,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRoute } from 'vue-router'
+import { getCourseList, createCourse, lectureViewImages } from '@/api/course'
+import { useAppStore } from '@/store/app'
 import EnrollDialog from './components/EnrollDialog.vue'
+import PublishCourseDialog from './components/PublishCourseDialog.vue'
+import CourseDetailView from './components/CourseDetailView.vue'
 
 const tabs = [
   { key: 'all', name: '全部课程' },
@@ -127,56 +155,13 @@ const tabs = [
 
 const activeTab = ref('all')
 
-const courses = ref([
-  {
-    id: 1,
-    type: 'newborn',
-    badge: '热门',
-    title: '新生儿护理入门：睡眠、喂养与常见问题应对',
-    instructor: '张医生 · 儿科主任医师',
-    instructorAvatar: 'https://picsum.photos/seed/ca1/100/100',
-    level: '入门',
-    duration: '共 12 讲 · 2.5 小时',
-    priceText: '免费',
-    cover: 'https://picsum.photos/seed/cc1/900/600',
-  },
-  {
-    id: 2,
-    type: 'nutrition',
-    badge: '精选',
-    title: '不同年龄段营养搭配：挑食、过敏与长高方案',
-    instructor: '刘营养师 · 注册营养师',
-    instructorAvatar: 'https://picsum.photos/seed/ca2/100/100',
-    level: '进阶',
-    duration: '共 16 讲 · 3.2 小时',
-    priceText: '免费',
-    cover: 'https://picsum.photos/seed/cc2/900/600',
-  },
-  {
-    id: 3,
-    type: 'psychology',
-    badge: '新课',
-    title: '亲子沟通训练：情绪管理与青春期冲突化解',
-    instructor: '李教授 · 心理学博士',
-    instructorAvatar: 'https://picsum.photos/seed/ca3/100/100',
-    level: '进阶',
-    duration: '共 10 讲 · 2.0 小时',
-    priceText: '免费',
-    cover: 'https://picsum.photos/seed/cc3/900/600',
-  },
-  {
-    id: 4,
-    type: 'education',
-    badge: '',
-    title: '学习习惯养成：从专注力到时间管理的系统训练',
-    instructor: '王老师 · 教育名师',
-    instructorAvatar: 'https://picsum.photos/seed/ca4/100/100',
-    level: '入门',
-    duration: '共 14 讲 · 2.8 小时',
-    priceText: '免费',
-    cover: 'https://picsum.photos/seed/cc4/900/600',
-  },
-])
+const appStore = useAppStore()
+const route = useRoute()
+
+const courses = ref([])
+const coverPreviewMap = ref(new Map())
+const courseLoading = ref(false)
+const highlightCourseId = ref(route.query.highlight ? String(route.query.highlight) : '')
 
 const topics = ref([
   {
@@ -204,11 +189,17 @@ const filteredCourses = computed(() => {
   return courses.value.filter((c) => c.type === activeTab.value)
 })
 
+const isExpert = computed(() => appStore.role === '专家')
+
 const coursesAnchor = ref(null)
 const topicsAnchor = ref(null)
 
 const enrollDialogVisible = ref(false)
 const currentCourse = ref(null)
+const createDialogVisible = ref(false)
+const createSubmitting = ref(false)
+const detailDialogVisible = ref(false)
+const detailCourseId = ref(null)
 
 function scrollToCourses() {
   const el = coursesAnchor.value
@@ -223,11 +214,17 @@ function scrollToTopics() {
 }
 
 function handleViewAll() {
-  ElMessage.info('查看全部课程：待接入后端')
+  activeTab.value = 'all'
+  fetchCourses()
 }
 
 function openCourse(course) {
-  ElMessage.info(`打开课程：${course.title}`)
+  detailCourseId.value = course?.id || course?.raw?.id
+  if (!detailCourseId.value) {
+    ElMessage.warning('无法展示课程详情')
+    return
+  }
+  detailDialogVisible.value = true
 }
 
 function enrollCourse(course) {
@@ -237,12 +234,170 @@ function enrollCourse(course) {
 
 function handleEnrollSubmit(payload) {
   const title = payload?.course?.title
-  ElMessage.success(title ? `已提交报名：${title}（待接入后端）` : '已提交报名（待接入后端）')
+  ElMessage.success(title ? `已提交报名：${title}` : '已提交报名成功')
 }
 
 function openTopic(topic) {
   ElMessage.info(`打开专题：${topic.title}`)
 }
+
+function normalizeListResponse(res) {
+  const source = res?.data ?? res
+  if (Array.isArray(source?.records)) return source.records
+  if (Array.isArray(source?.list)) return source.list
+  if (Array.isArray(source)) return source
+  return []
+}
+
+function normalizeImage(value) {
+  if (Array.isArray(value)) return normalizeImage(value[0])
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (trimmed.startsWith('http')) return trimmed
+  if (trimmed.startsWith('data:')) return trimmed
+  return `data:image/jpeg;base64,${trimmed}`
+}
+
+function formatDuration(seconds) {
+  const totalSeconds = Number(seconds || 0)
+  if (!totalSeconds || Number.isNaN(totalSeconds)) return '时长未知'
+  const minutes = Math.max(1, Math.round(totalSeconds / 60))
+  return minutes >= 60 ? `${(minutes / 60).toFixed(1)} 小时` : `${minutes} 分钟`
+}
+
+function mapCourseItem(item) {
+  const duration = formatDuration(item?.durationSeconds)
+  const type = item?.category || item?.courseCategory || 'all'
+  const badge = item?.auditStatus === 1 ? '已上线' : item?.auditStatus === 0 ? '待审核' : ''
+  const coverKey = item?.coverUrl
+  const previewCover = coverKey ? coverPreviewMap.value.get(coverKey) : ''
+
+  return {
+    id: item?.id,
+    type,
+    badge,
+    title: item?.title || '未命名课程',
+    instructor: item?.expertNickname || '专家课程',
+    instructorAvatar: normalizeImage(item?.expertAvatar) || 'https://picsum.photos/seed/course-avatar/100/100',
+    level: item?.level || '综合',
+    duration,
+    priceText: Number(item?.price ?? item?.coursePrice ?? 0) > 0 ? `¥${item.price}` : '免费',
+    cover: previewCover || 'https://picsum.photos/seed/course-cover/900/600',
+    coverUrl: coverKey,
+    raw: item,
+  }
+}
+
+function cleanupCourseCoverPreviews() {
+  coverPreviewMap.value.forEach((url) => {
+    if (typeof url === 'string' && url.startsWith('blob:')) {
+      URL.revokeObjectURL(url)
+    }
+  })
+  coverPreviewMap.value.clear()
+}
+
+async function populateCourseCoverPreviews(courseList) {
+  const tasks = (courseList || []).map(async (course) => {
+    const key = course?.coverUrl
+    if (!key || coverPreviewMap.value.has(key)) return
+    try {
+      const buffer = await lectureViewImages(key)
+      if (!buffer) return
+      const blob = new Blob([buffer], { type: 'image/jpeg' })
+      const url = URL.createObjectURL(blob)
+      coverPreviewMap.value.set(key, url)
+      course.cover = url
+    } catch (error) {
+      console.error('课程封面预览失败', error)
+    }
+  })
+  await Promise.all(tasks)
+}
+
+async function fetchCourses() {
+  courseLoading.value = true
+  cleanupCourseCoverPreviews()
+  try {
+    const res = await getCourseList({ page: 1, size: 30 })
+    const list = normalizeListResponse(res)
+    courses.value = list.map(mapCourseItem)
+    await populateCourseCoverPreviews(courses.value)
+    nextTick(scrollToHighlight)
+  } catch (error) {
+    courses.value = []
+    ElMessage.error(error?.message || '获取课程列表失败')
+  } finally {
+    courseLoading.value = false
+  }
+}
+
+
+function openCreateDialog() {
+  createDialogVisible.value = true
+}
+
+async function handleCreateCourseSubmit(payload) {
+  const title = payload?.title?.trim()
+  const videoKey = payload?.videoObjectKey?.trim()
+  if (!title || !videoKey) {
+    ElMessage.warning('课程信息不完整，无法提交')
+    return
+  }
+
+  const submitPayload = {
+    title,
+    coverUrl: payload.coverUrl?.trim() || '',
+    courseDesc: payload.courseDesc?.trim() || '',
+    videoObjectKey: videoKey,
+    durationSeconds: Math.max(60, Math.round(Number(payload.durationMinutes) * 60)),
+    expertId: appStore.userInfo?.id,
+  }
+
+  createSubmitting.value = true
+  try {
+    await createCourse(submitPayload)
+    ElMessage.success('课程已提交审核')
+    createDialogVisible.value = false
+    await fetchCourses()
+  } catch (error) {
+    ElMessage.error(error?.message || '创建课程失败')
+  } finally {
+    createSubmitting.value = false
+  }
+}
+
+function handleDetailClose() {
+  detailDialogVisible.value = false
+  detailCourseId.value = null
+}
+
+function scrollToHighlight() {
+  if (!highlightCourseId.value) return
+  nextTick(() => {
+    const el = document.querySelector(`[data-course-id="course-${highlightCourseId.value}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  })
+}
+
+watch(
+  () => route.query.highlight,
+  (val) => {
+    highlightCourseId.value = val ? String(val) : ''
+    if (val) scrollToHighlight()
+  }
+)
+
+onMounted(() => {
+  fetchCourses()
+})
+
+onUnmounted(() => {
+  cleanupCourseCoverPreviews()
+})
 </script>
 
 <style scoped>
@@ -319,6 +474,21 @@ function openTopic(topic) {
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
   font-weight: 700;
+}
+
+.btn-create {
+  background: linear-gradient(120deg, rgba(34, 197, 94, 1), rgba(59, 130, 246, 1));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+  padding: 12px 26px;
+  font-weight: 700;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-create:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(59, 130, 246, 0.35);
 }
 
 .courses-main {
@@ -398,6 +568,11 @@ function openTopic(topic) {
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   cursor: pointer;
+}
+
+.course-card.highlight {
+  border-color: rgba(249, 115, 22, 1);
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.15);
 }
 
 .course-cover {
@@ -492,6 +667,26 @@ function openTopic(topic) {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 18px;
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  padding: 48px 16px;
+  text-align: center;
+  color: rgba(100, 116, 139, 1);
+  background: rgba(248, 250, 252, 1);
+  border-radius: 12px;
+}
+
+.duration-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.duration-hint {
+  color: rgba(100, 116, 139, 1);
+  font-size: 13px;
 }
 
 .topic-card {

@@ -15,9 +15,9 @@
         </div>
         <el-tag :type="statusTypeMap[item.status]">{{ statusLabelMap[item.status] }}</el-tag>
         <div class="row-actions">
-          <el-button size="small" @click="emit('preview', '课程', item.title)">预览</el-button>
-          <el-button size="small" type="success" @click="emit('approve', '课程', item.title)">通过</el-button>
-          <el-button size="small" type="danger" @click="emit('reject', '课程', item.title)">驳回</el-button>
+          <el-button size="small" type="info" plain @click="emit('view-detail', item)">查看详情</el-button>
+          <el-button size="small" type="success" @click="emit('approve', item)">通过</el-button>
+          <el-button size="small" type="danger" @click="emit('reject', item)">驳回</el-button>
         </div>
       </div>
     </div>
@@ -40,7 +40,7 @@ defineProps({
   },
 })
 
-const emit = defineEmits(['preview', 'approve', 'reject'])
+const emit = defineEmits(['preview', 'view-detail', 'approve', 'reject'])
 </script>
 
 <style scoped>

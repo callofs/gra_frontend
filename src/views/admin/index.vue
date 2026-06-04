@@ -65,10 +65,12 @@
 
         <CourseReviewPanel
           v-else-if="activeModule === 'course'"
+          v-loading="courseReviewLoading"
           :items="courseReviews"
           :status-label-map="statusLabelMap"
           :status-type-map="statusTypeMap"
           @preview="handlePreview"
+          @view-detail="openCourseDetail"
           @approve="handleApprove"
           @reject="handleReject"
         />
@@ -81,6 +83,16 @@
           @toggle="handleToggleBoard"
         />
       </section>
+      <el-dialog
+        v-model="courseDetailDialogVisible"
+        title="课程详情"
+        width="960px"
+        :destroy-on-close="true"
+        append-to-body
+        @close="handleCourseDetailClose"
+      >
+        <CourseDetailView :course-id="courseDetailId" :visible="courseDetailDialogVisible" />
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -91,11 +103,13 @@ import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { auditForum, getAllForumList } from '@/api/forum'
 import { changeUserRole, getExpertCertificationMaterial, getExpertCertificationMaterialList } from '@/api/admin'
+import { auditCourse, getAllCourseList } from '@/api/course'
 import { useAppStore } from '@/store/app'
 import CertificationReviewPanel from './components/CertificationReviewPanel.vue'
 import PostReviewPanel from './components/PostReviewPanel.vue'
 import CourseReviewPanel from './components/CourseReviewPanel.vue'
 import BoardManagePanel from './components/BoardManagePanel.vue'
+import CourseDetailView from '@/views/courses/components/CourseDetailView.vue'
 
 const appStore = useAppStore()
 const router = useRouter()
@@ -109,6 +123,22 @@ const statusLabelMap = {
   rejected: '已驳回',
 }
 
+function mapCourseReviewItem(item) {
+  const status = normalizeAuditStatus(item?.auditStatus ?? item?.status)
+  const priceNumber = Number(item?.price ?? item?.coursePrice ?? 0)
+
+  return {
+    type: COURSE_TYPE,
+    id: item?.id,
+    title: item?.title || '未命名课程',
+    instructor: item?.expertNickname || item?.instructor || '未知讲师',
+    category: item?.category || item?.courseCategory || '综合专题',
+    price: priceNumber > 0 ? `¥${priceNumber.toFixed?.(2) || priceNumber}` : '免费',
+    status,
+    raw: item,
+  }
+}
+
 const statusTypeMap = {
   pending: 'warning',
   approved: 'success',
@@ -116,16 +146,38 @@ const statusTypeMap = {
 }
 
 const CERTIFICATION_TYPE = 'certification'
+const COURSE_TYPE = 'course'
 
 const certifications = ref([])
 
 const postReviews = ref([])
 
-const courseReviews = ref([
-  { id: 1, title: '亲子沟通训练营', instructor: '李教授', category: '心理成长', price: '免费', status: 'pending' },
-  { id: 2, title: '儿童营养喂养指南', instructor: '刘营养师', category: '营养喂养', price: '免费', status: 'approved' },
-  { id: 3, title: '专注力系统训练', instructor: '王老师', category: '学习方法', price: '免费', status: 'pending' },
-])
+const courseReviews = ref([])
+const courseReviewLoading = ref(false)
+const courseDetailDialogVisible = ref(false)
+const courseDetailId = ref(null)
+
+function normalizeCourseListResponse(res) {
+  const source = res?.data ?? res
+  if (Array.isArray(source?.records)) return source.records
+  if (Array.isArray(source?.list)) return source.list
+  if (Array.isArray(source)) return source
+  return []
+}
+
+async function fetchCourseReviews() {
+  courseReviewLoading.value = true
+  try {
+    const res = await getAllCourseList({ page: 1, size: 50 })
+    const list = normalizeCourseListResponse(res)
+    courseReviews.value = list.map(mapCourseReviewItem)
+  } catch (error) {
+    courseReviews.value = []
+    ElMessage.error(error?.message || '获取课程审核列表失败')
+  } finally {
+    courseReviewLoading.value = false
+  }
+}
 
 const boards = ref([
   { id: 1, name: '睡眠训练', owner: '张版主', postCount: 126, sort: 1, enabled: true },
@@ -215,6 +267,10 @@ function formatDateTime(value) {
 
 function isCertificationItem(payload) {
   return payload && typeof payload === 'object' && payload.type === CERTIFICATION_TYPE
+}
+
+function isCourseItem(payload) {
+  return payload && typeof payload === 'object' && payload.type === COURSE_TYPE
 }
 
 function mapCertificationItem(item) {
@@ -330,6 +386,11 @@ function handlePreview(type, name) {
     return
   }
 
+  if (isCourseItem(type)) {
+    openCourseDetail(type)
+    return
+  }
+
   if (typeof type === 'object' && type?.id) {
     router.push({ name: 'forum-detail', params: { id: type.id } })
     return
@@ -338,11 +399,34 @@ function handlePreview(type, name) {
   ElMessage.info(`预览${type}：${name}`)
 }
 
+function openCourseDetail(target) {
+  const id = typeof target === 'object' ? target?.id || target?.raw?.id : target
+  if (!id) return
+  courseDetailId.value = id
+  courseDetailDialogVisible.value = true
+}
+
+function handleCourseDetailClose() {
+  courseDetailDialogVisible.value = false
+  courseDetailId.value = null
+}
+
 async function handleApprove(type, name) {
   if (isCertificationItem(type)) {
     const success = await assignUserRole(type.userId, 2, `${type.name} 已授予专家角色`)
     if (success) {
       updateCertificationStatus(type.id, 'approved')
+    }
+    return
+  }
+
+  if (isCourseItem(type)) {
+    try {
+      await auditCourse(type.id, 1, '课程审核通过')
+      ElMessage.success(`课程审核通过：${type.title}`)
+      await fetchCourseReviews()
+    } catch (error) {
+      ElMessage.error(error?.message || '课程审核通过失败')
     }
     return
   }
@@ -366,6 +450,17 @@ async function handleReject(type, name) {
     const success = await assignUserRole(type.userId, 1, `${type.name} 认证已驳回，恢复普通用户角色`)
     if (success) {
       updateCertificationStatus(type.id, 'rejected')
+    }
+    return
+  }
+
+  if (isCourseItem(type)) {
+    try {
+      await auditCourse(type.id, 2, '课程已驳回')
+      ElMessage.warning(`课程已驳回：${type.title}`)
+      await fetchCourseReviews()
+    } catch (error) {
+      ElMessage.error(error?.message || '课程驳回失败')
     }
     return
   }
@@ -403,6 +498,7 @@ function handleToggleBoard(item) {
 onMounted(() => {
   fetchCertifications()
   fetchPostReviews()
+  fetchCourseReviews()
 })
 </script>
 
